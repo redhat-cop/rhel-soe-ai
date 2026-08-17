@@ -29,7 +29,7 @@ what `--check --diff` reports from the underlying modules, nothing more.
 **Audit** (read-only, safe to run any time):
 
 ```
-ansible-playbook ansible/site.yml --tags system_init --check --diff
+ansible-playbook ansible/configure_rhel.yml --tags system_init --check --diff
 ```
 
 Summarize the diff output and any failed tasks in plain language.
@@ -39,8 +39,17 @@ first summarize what will change from the `--check --diff` output, then run
 the same command without `--check`:
 
 ```
-ansible-playbook ansible/site.yml --tags system_init
+ansible-playbook ansible/configure_rhel.yml --tags system_init
 ```
+
+> **Behavior change from the old `ansible/site.yml`:** this role is now
+> **active by default** in `ansible/configure_rhel.yml`'s `roles:` list —
+> unlike the old baseline playbook, which deliberately excluded it (see
+> "Wiring into the SOE" below). A full, untagged
+> `ansible-playbook ansible/configure_rhel.yml` run now reboots the host
+> as a side effect, because `reboot` is in `system_init_final_actions`'
+> default list. Flag this loudly before anyone runs the full baseline
+> playbook without `--tags` against a host they don't expect to reboot.
 
 **Propose a change to the role itself**: never edit and commit directly. On a
 branch named `soe/system_init/<short-desc>`, edit `ansible/roles/system_init/`, validate
@@ -60,12 +69,17 @@ body. Then stop — a human reviews and merges; see `docs/ARCHITECTURE.md`'s
 
 ## Wiring into the SOE
 
-This role is deliberately **excluded** from `ansible/site.yml`'s default
-`roles:` list (see the comment above that list, and the "excluded from the
-default run" table in `.claude/skills/soe/SKILL.md`) because it acts
-unconditionally with no guard variable and/or reboots, auto-updates, or
-de-registers the host outright. It only runs when explicitly invoked with
-`--tags system_init`, as shown above — never as a side effect of a full SOE
-run. Don't add it back to `ansible/site.yml`'s default list without an
-explicit decision from a human operator; that would be a cross-cutting,
-high-blast-radius change in its own right.
+This role is **included and active** in `ansible/configure_rhel.yml`'s
+`roles:` list (uncommented, at the very end) — this is the opposite of its
+old status under `ansible/site.yml`, where it was deliberately excluded
+from the default `roles:` list (see the "excluded from the default run"
+table this repo used to keep in `.claude/skills/soe/SKILL.md`) because it
+acts unconditionally with no guard variable and reboots the host. That
+exclusion doesn't apply to `configure_rhel.yml`: a plain, untagged
+`ansible-playbook ansible/configure_rhel.yml` run now **does** reboot the
+host via this role. If a host needs `configure_rhel.yml`'s baseline
+without the reboot, either run with `--tags` excluding `system_init`
+(`--skip-tags system_init`), or override `system_init_final_actions` to
+drop `reboot` for that host/group. Don't assume this role is a safe no-op
+the way it was when `site.yml` was the entrypoint. This repo no longer
+uses `ansible/site.yml`; see `docs/ARCHITECTURE.md`.

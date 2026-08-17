@@ -28,7 +28,7 @@ Encoded in `ansible/roles/system_locale/defaults/main.yml`:
 
 ## What to do
 
-**Audit**: `ansible-playbook ansible/site.yml --tags system_locale --check --diff`
+**Audit**: `ansible-playbook ansible/configure_rhel.yml --tags system_locale --check --diff`
 
 **Remediate**: same command without `--check`. Because
 `system_locale_reboot` defaults to `true`, a remediate run that actually

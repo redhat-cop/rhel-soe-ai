@@ -24,7 +24,14 @@ Encoded in `ansible/roles/system_keyboard/defaults/main.yml`:
 
 ## What to do
 
-**Audit**: `ansible-playbook ansible/site.yml --tags system_keyboard --check --diff`.
+> **This role is currently commented out** in `ansible/configure_rhel.yml`'s `roles:` list (`#- system_keyboard`) and its associated
+> `vars:` block is left at placeholder/empty values. `--tags system_keyboard` will report
+> "did not match any tags" until a human operator uncomments the role (and
+> fills in the vars it needs) in `ansible/configure_rhel.yml` — this is a
+> deliberate, host-baseline-scoped opt-in, not a bug. Flag this to the user
+> before assuming the commands below will do anything.
+
+**Audit**: `ansible-playbook ansible/configure_rhel.yml --tags system_keyboard --check --diff`.
 The keymap/font check tasks use `lineinfile` in `check_mode: true`
 internally (a self-contained probe), so they report accurately regardless
 of the outer `--check` flag — but the `localectl`, `setfont`, and `dracut`

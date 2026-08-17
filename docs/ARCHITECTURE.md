@@ -4,9 +4,11 @@ soe-ai defines a Linux Standard Operating Environment (SOE) as a set of
 independent Claude Code **skills**, one per configuration domain. Each
 skill's deliverable is an **Ansible role** under `ansible/roles/<domain>/`
 that owns the baseline, drift-checking, and remediation logic for exactly
-one part of the system (accounts, time sync, USB policy, etc.). A top-level
-`ansible/site.yml` playbook (paired with the `soe` orchestrator skill) runs
-all of them and rolls the results into a single compliance run.
+one part of the system (accounts, time sync, USB policy, etc.). Rather than
+one top-level playbook running every domain role unconditionally, the roles
+are wired into **six purpose-scoped playbooks** — see "Playbook layout"
+below — and the `soe` orchestrator skill knows which playbook to use for a
+given task.
 
 ## Why skills that output Ansible roles
 
@@ -16,12 +18,41 @@ all of them and rolls the results into a single compliance run.
   CI, instead of requiring a bespoke runner.
 - Each domain's knowledge (which files, which modules, which RHEL tooling)
   stays isolated in its own role directory and is independently testable
-  (`ansible-playbook site.yml --tags <domain>`).
+  (`ansible-playbook configure_rhel.yml --tags <domain>`, or whichever
+  playbook actually wires that role in — see below).
 - Ansible modules are declarative and (mostly) idempotent by construction,
   so **audit and remediate are the same code path** — see below — instead
   of a separate hand-maintained script per mode.
-- New domains are added by adding a new role; `ansible/site.yml` and the
-  `soe` skill are the only places that need to know the full list.
+- New domains are added by adding a new role; whichever playbook(s) should
+  trigger it, and the `soe` skill, are the only other places that need to
+  know about it.
+
+## Playbook layout
+
+This repo does **not** use a single `ansible/site.yml` covering every
+domain. Instead:
+
+| Playbook | Scope |
+|---|---|
+| `configure_rhel.yml` | General host baseline — most domain roles live here, driven by a `vars:` block in the same file rather than each role's own `defaults/`. Many roles are present but commented out (opt-in). |
+| `connect_linux.yml` | Pre-flight connectivity/access check — no roles, just ad hoc tasks confirming SSH reachability and `become`. |
+| `load_balancer_setup.yml` | Configures a host as an haproxy + keepalived load balancer, reusing generic roles (`packages_install`, `files_copy`, `sebooleans`, `service_state`) with load-balancer-specific variables. |
+| `nfs_client_setup.yml` | Configures a host as an NFS client, reusing `packages_install`, `files_create`, `service_state`, `mount_setup`. |
+| `nfs_server_setup.yml` | Configures a host as an NFS server, reusing `packages_install`, `files_create`, `files_copy`, `sebooleans`, `firewall`, `service_state`. |
+| `update_rhel.yml` | Reports (and, opt-in, applies) pending dnf updates. |
+
+A handful of roles — `packages_install`, `files_copy`, `files_create`,
+`sebooleans`, `service_state`, `firewall`, `mount_setup` — are **shared
+building blocks**: the same role directory is invoked by more than one
+playbook above, each time with different variables set directly in that
+playbook rather than the role's own `defaults/main.yml`. That's a
+deliberate reuse pattern (why re-implement "install a package list" or
+"copy a file" per scenario?), not duplication to clean up — but it does
+mean "is `packages_install` compliant?" is a question that only makes
+sense against one specific playbook at a time, not the role in the
+abstract. See `.claude/skills/soe/SKILL.md` for the full role-to-playbook
+mapping, including which roles are opt-in (commented out by default) and
+which aren't wired into any playbook at all yet.
 
 ## Target platform
 
@@ -37,8 +68,13 @@ other distros.
 ```
 ansible/
   ansible.cfg
-  site.yml                 # top-level playbook: runs every domain role
-  inventory/hosts.ini       # sample inventory — add managed hosts here
+  configure_rhel.yml         # general host baseline playbook
+  connect_linux.yml           # pre-flight connectivity/access check (no roles)
+  load_balancer_setup.yml      # haproxy + keepalived load balancer
+  nfs_client_setup.yml          # NFS client (mounts one export)
+  nfs_server_setup.yml           # NFS server (exports one directory)
+  update_rhel.yml                 # pending-update report (+ opt-in apply)
+  inventory/hosts.ini               # sample inventory — add managed hosts here
   roles/
     <domain>/
       defaults/main.yml     # baseline variables — override per host/group
@@ -46,7 +82,7 @@ ansible/
       handlers/main.yml      # e.g. restart the service a config edit affects
       meta/main.yml           # role metadata
 .claude/skills/
-  soe/SKILL.md              # orchestrator: how/when to run site.yml
+  soe/SKILL.md              # orchestrator: which playbook to use for what
   <domain>/SKILL.md          # per-domain: baseline + how to run/extend the role
 .github/workflows/
   ansible-ci.yml            # syntax-check + ansible-lint on every PR touching ansible/**
@@ -59,10 +95,11 @@ docs/
 Ansible already has a built-in read-only mode, so domain roles don't need a
 separate audit script:
 
-- **Audit**: `ansible-playbook site.yml --tags <domain> --check --diff`.
-  State-changing modules (`package`, `service`, `lineinfile`, `copy`, ...)
-  report what they *would* change without touching the system. `--diff`
-  shows the actual before/after content diff.
+- **Audit**: `ansible-playbook <playbook>.yml --tags <domain> --check --diff`,
+  using whichever playbook from the table above actually contains that
+  role. State-changing modules (`package`, `service`, `lineinfile`,
+  `copy`, ...) report what they *would* change without touching the
+  system. `--diff` shows the actual before/after content diff.
 - **Remediate**: the same command without `--check`. Modules apply the
   change; handlers fire; the role is safe to re-run (idempotent).
 
@@ -93,7 +130,10 @@ a failed task with the `fail_msg` explaining what's wrong, both under
   default: `usbguard_setup` installs USBGuard and prepares its policy but
   only enables the service when `soe_usbguard_manage_service: true` is set
   explicitly, because a default-block USB policy without a reviewed HID
-  allow rule can lock out a physically-connected keyboard/mouse.
+  allow rule can lock out a physically-connected keyboard/mouse. (In
+  `configure_rhel.yml`, `usbguard_setup` is additionally commented out of
+  the `roles:` list entirely — a second layer of opt-in on top of the
+  role's own variable.)
 - `boot_parameters` is audit-only by design — GRUB command-line edits only
   take effect on next boot and a bad one can leave a host unbootable, so
   this role asserts required/forbidden kernel parameters but leaves the
@@ -101,6 +141,17 @@ a failed task with the `fail_msg` explaining what's wrong, both under
 - Config edits that could break remote access are validated before being
   applied: `motd_issue`'s sshd `Banner` edit runs `sshd -t -f %s` via
   `lineinfile`'s `validate` option before touching `sshd_config`.
+- **Commenting a role out of a playbook's `roles:` list is itself a safety
+  convention now**, not just an unused-code smell: `configure_rhel.yml`
+  keeps 21 roles present-but-commented specifically so a plain, untagged
+  run of the baseline playbook doesn't silently pick up something
+  high-blast-radius (account deletion, USB lockdown, AD domain join) that
+  a host's group_vars haven't been reviewed for yet. Don't "clean up" by
+  uncommenting a role across the board — uncomment one role for one host
+  or group, deliberately, per the branch + PR workflow below. One
+  exception worth flagging: `system_init` is *not* on this commented list
+  in `configure_rhel.yml` even though it reboots the host by default —
+  see that role's `SKILL.md`.
 
 ## Contribution workflow: branch + PR
 
@@ -113,13 +164,15 @@ directly:
    One domain per branch — don't bundle unrelated roles into the same
    change, so review stays scoped to what one agent actually owns.
 2. **Change**: edit `ansible/roles/<domain>/` only (a cross-cutting change
-   that touches `ansible/site.yml` or more than one role gets its own
-   branch/PR, scoped just to that change).
-3. **Validate locally** before opening the PR:
-   - `ansible-playbook site.yml --tags <domain> --syntax-check`
+   that touches one of the top-level playbooks or more than one role gets
+   its own branch/PR, scoped just to that change).
+3. **Validate locally** before opening the PR, against whichever
+   playbook(s) actually contain the role (see
+   `.claude/skills/soe/SKILL.md`'s tables):
+   - `ansible-playbook <playbook>.yml --tags <domain> --syntax-check`
    - `ansible-lint roles/<domain>/` (see `.ansible-lint` for this repo's
      one deliberate rule exception, with rationale)
-   - `ansible-playbook site.yml --tags <domain> --check --diff` against a
+   - `ansible-playbook <playbook>.yml --tags <domain> --check --diff` against a
      real or test host if one is available, to see the actual drift/diff
      the change produces
 4. **Commit** with a message explaining why, not just what.
@@ -147,9 +200,17 @@ a live host — needs an explicit human decision.
 3. Add `check_mode: false` to any read-only `command`/`shell` task that
    feeds an `assert`, and `create: true` to any `lineinfile` targeting a
    config file that might not pre-exist on a minimal install.
-4. Add the role to the `roles:` list in `ansible/site.yml`.
+4. Decide where the role belongs and wire it in accordingly:
+   - General host baseline → add it (active, or commented out if it's
+     high-blast-radius/opt-in) to `ansible/configure_rhel.yml`'s `roles:`
+     list, with a matching `vars:` entry.
+   - A specific host purpose (load balancer, NFS client/server, update
+     run) → add it to the matching existing playbook, or propose a new
+     purpose-scoped playbook following the same shape (a `vars:` block
+     plus a short `roles:` list) if none of the existing ones fit.
 5. Write `.claude/skills/<domain>/SKILL.md` documenting the baseline and
-   how to run the role for audit/remediate, and add a row to the table in
+   how to run the role for audit/remediate against whichever playbook(s)
+   now contain it, and add a row to the appropriate table in
    `.claude/skills/soe/SKILL.md`.
 6. Propose all of the above via the branch + PR workflow above — even a
    new domain's first version goes through review, not a direct commit.

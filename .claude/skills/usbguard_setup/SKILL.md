@@ -44,7 +44,14 @@ Encoded in `ansible/roles/usbguard_setup/defaults/main.yml`:
 
 ## What to do
 
-**Audit**: `ansible-playbook ansible/site.yml --tags usbguard_setup --check --diff`
+> **This role is currently commented out** in `ansible/configure_rhel.yml`'s `roles:` list (`#- usbguard_setup`) and its associated
+> `vars:` block is left at placeholder/empty values. `--tags usbguard_setup` will report
+> "did not match any tags" until a human operator uncomments the role (and
+> fills in the vars it needs) in `ansible/configure_rhel.yml` — this is a
+> deliberate, host-baseline-scoped opt-in, not a bug. Flag this to the user
+> before assuming the commands below will do anything.
+
+**Audit**: `ansible-playbook ansible/configure_rhel.yml --tags usbguard_setup --check --diff`
 
 **Before any remediate run on a host that is not `policy: allow`**:
 confirm with the user (a) they have a non-USB or already-reviewed access
@@ -54,7 +61,7 @@ reviewed rules template — since the default is an empty rules file and
 this role enables enforcement in the same run, not a separate step:
 
 ```
-ansible-playbook ansible/site.yml --tags usbguard_setup
+ansible-playbook ansible/configure_rhel.yml --tags usbguard_setup
 ```
 
 **To explicitly disable enforcement instead** (allow all USB devices,

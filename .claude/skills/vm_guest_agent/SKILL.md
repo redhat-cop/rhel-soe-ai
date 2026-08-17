@@ -24,7 +24,18 @@ Encoded in `ansible/roles/vm_guest_agent/defaults/main.yml`
 
 ## What to do
 
-**Audit**: `ansible-playbook ansible/site.yml --tags vm_guest_agent --check --diff`
+> **Known naming mismatch** (pre-existing, not introduced by this change):
+> the actual role directory and the tag used by `configure_rhel.yml`'s
+> `roles:` list are both `guest_agent`, not `vm_guest_agent` — see
+> `.claude/skills/guest_agent/SKILL.md` and the note in
+> `.claude/skills/soe/SKILL.md`'s domain table ("role dir is `guest_agent`,
+> not `vm_guest_agent`"). `--tags vm_guest_agent` will report "did not
+> match any tags" against every playbook in this repo. Use `--tags
+> guest_agent` (see that skill) until this mismatch is resolved, or flag it
+> to a human operator as something worth fixing via the branch + PR
+> workflow.
+
+**Audit**: `ansible-playbook ansible/configure_rhel.yml --tags guest_agent --check --diff`
 
 **Remediate**: same command without `--check`, after explicit user
 approval.

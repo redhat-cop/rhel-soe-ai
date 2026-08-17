@@ -36,7 +36,7 @@ Encoded in `ansible/roles/timesync/defaults/main.yml`:
 **To audit** (read-only, safe to run any time):
 
 ```
-ansible-playbook ansible/site.yml --tags timesync --check --diff
+ansible-playbook ansible/configure_rhel.yml --tags timesync --check --diff
 ```
 
 Summarize the diff output and any failed tasks in plain language. Because
@@ -50,7 +50,7 @@ asks): first summarize what will change from the `--check --diff` output,
 then run the same command without `--check`:
 
 ```
-ansible-playbook ansible/site.yml --tags timesync
+ansible-playbook ansible/configure_rhel.yml --tags timesync
 ```
 
 **To propose a change to the role itself** (e.g. changing the default

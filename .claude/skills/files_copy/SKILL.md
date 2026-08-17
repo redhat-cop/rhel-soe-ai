@@ -30,21 +30,49 @@ what `--check --diff` reports from the underlying modules, nothing more.
 
 ## What to do
 
+This role is **not** in `ansible/configure_rhel.yml`'s `roles:` list at all
+(not even commented out) — it's currently wired in only by the two
+purpose-built composite playbooks below, each setting `files_copy` itself
+rather than relying on this role's (empty) defaults. Pick whichever
+playbook matches what the host actually is:
+
+- **Load balancer host** — `ansible/load_balancer_setup.yml` copies the
+  `keepalived-notify-haproxy` script plus renders the haproxy/keepalived
+  config templates.
+- **NFS server** — `ansible/nfs_server_setup.yml` writes the
+  `/etc/exports.d/ansible.exports` content.
+
+> `ansible/load_balancer_setup.yml`'s `files_copy`/`files_copy_templates`
+> entries reference `keepalived-notify-haproxy` and three `.j2` templates
+> that **don't currently exist anywhere in this repo** — see that
+> playbook's `SKILL.md` for the verified gap. Its `files_copy` tasks fail
+> with "could not find src" until those assets are added. This doesn't
+> affect the NFS server use above, which uses inline `content:` rather
+> than a `src:` file reference.
+
 **Audit** (read-only, safe to run any time):
 
 ```
-ansible-playbook ansible/site.yml --tags files_copy --check --diff
+ansible-playbook ansible/load_balancer_setup.yml --tags files_copy --check --diff
+ansible-playbook ansible/nfs_server_setup.yml --tags files_copy --check --diff
 ```
 
 Summarize the diff output and any failed tasks in plain language.
 
 **Remediate** (modifies the system — only after the user explicitly asks):
 first summarize what will change from the `--check --diff` output, then run
-the same command without `--check`:
+the matching playbook without `--check`:
 
 ```
-ansible-playbook ansible/site.yml --tags files_copy
+ansible-playbook ansible/load_balancer_setup.yml --tags files_copy
+ansible-playbook ansible/nfs_server_setup.yml --tags files_copy
 ```
+
+If a host needs `files_copy` for something outside these two scenarios,
+either add it (uncommented, with its own `vars:`) to
+`ansible/configure_rhel.yml`, or write a small dedicated playbook — same
+pattern as `load_balancer_setup.yml`/`nfs_server_setup.yml` — via the
+branch + PR workflow below.
 
 **Propose a change to the role itself**: never edit and commit directly. On a
 branch named `soe/files_copy/<short-desc>`, edit `ansible/roles/files_copy/`, validate
@@ -56,7 +84,9 @@ body. Then stop — a human reviews and merges; see `docs/ARCHITECTURE.md`'s
 
 ## Wiring into the SOE
 
-This role is included in `ansible/site.yml`'s default `roles:` list and has
-a row in `.claude/skills/soe/SKILL.md`'s domain table, so it runs as part of
-both `ansible-playbook ansible/site.yml --tags files_copy ...` and a full,
-untagged `ansible-playbook ansible/site.yml` run.
+This role has a row in `.claude/skills/soe/SKILL.md`'s domain table but is
+**not** part of the general baseline (`ansible/configure_rhel.yml`) — it
+only runs as part of `ansible/load_balancer_setup.yml` or
+`ansible/nfs_server_setup.yml`, and only for the specific files each of
+those playbooks lists in its own `vars:`. This repo no longer uses
+`ansible/site.yml`; see `docs/ARCHITECTURE.md`.

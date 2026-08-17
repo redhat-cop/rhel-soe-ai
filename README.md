@@ -10,8 +10,13 @@ script.
 
 ```
 ansible/
-  site.yml                    # top-level playbook: runs every domain role
-  inventory/hosts.ini          # sample inventory — add managed hosts here
+  configure_rhel.yml           # general host baseline playbook: runs most domain roles
+  connect_linux.yml             # pre-flight connectivity/access check (no roles)
+  load_balancer_setup.yml        # haproxy + keepalived load balancer
+  nfs_client_setup.yml            # NFS client (mounts one export)
+  nfs_server_setup.yml             # NFS server (exports one directory)
+  update_rhel.yml                   # pending-update report (+ opt-in apply)
+  inventory/hosts.ini                # sample inventory — add managed hosts here
   roles/
     timesync/                  # reference implementation
     accounts_policy/           # local account/password policy
@@ -26,16 +31,44 @@ ansible/
     troubleshooting_tools/             # baseline troubleshooting package set
     usbguard_setup/                     # USBGuard policy (service enablement is opt-in)
 .claude/skills/
-  soe/SKILL.md                # orchestrator: how/when to run ansible/site.yml
-  <domain>/SKILL.md            # per-domain: baseline + how to run/extend the role
+  soe/SKILL.md                # orchestrator: which playbook to use for what
+  connect_linux/SKILL.md       # pre-flight connectivity/access check
+  load_balancer_setup/SKILL.md  # haproxy + keepalived load balancer
+  nfs_client_setup/SKILL.md      # NFS client
+  nfs_server_setup/SKILL.md       # NFS server
+  update_rhel/SKILL.md             # pending-update report + opt-in apply
+  <domain>/SKILL.md                 # per-domain: baseline + how to run/extend the role
 .github/workflows/
   ansible-ci.yml              # syntax-check + ansible-lint on every PR touching ansible/**
 docs/
   ARCHITECTURE.md            # design rationale, audit/remediate conventions, safety rules
 ```
 
-All 12 domain roles are fully implemented — real, idempotent Ansible tasks,
-not stubs.
+All domain roles are fully implemented — real, idempotent Ansible tasks,
+not stubs. This repo does **not** use a single `site.yml` covering every
+domain; instead the roles are spread across the six playbooks above, each
+scoped to a specific host role or task. See "Playbook layout" below and
+`docs/ARCHITECTURE.md` for why, and `.claude/skills/soe/SKILL.md` for the
+full role-to-playbook mapping.
+
+## Playbook layout
+
+| Playbook | Scope |
+|---|---|
+| `configure_rhel.yml` | General host baseline. Most domain roles are configured here; some are commented out by default (opt-in). |
+| `connect_linux.yml` | Pre-flight connectivity/access check — confirms SSH reachability and `become` before anything else runs. No roles. |
+| `load_balancer_setup.yml` | Configures a host as an haproxy + keepalived load balancer. |
+| `nfs_client_setup.yml` | Configures a host as an NFS client. |
+| `nfs_server_setup.yml` | Configures a host as an NFS server. |
+| `update_rhel.yml` | Reports pending dnf updates (applying them is opt-in). |
+
+A few roles (`packages_install`, `files_copy`, `files_create`,
+`sebooleans`, `service_state`, `firewall`, `mount_setup`) are reused across
+more than one of these playbooks, each time with different,
+playbook-specific variables — e.g. `packages_install` installs a general
+utility set under `configure_rhel.yml` but installs `haproxy`/`keepalived`
+under `load_balancer_setup.yml`. Check which playbook actually matches a
+host's role before picking one.
 
 ## Audit vs. remediate
 
@@ -43,14 +76,17 @@ Every domain maps onto Ansible's own check mode, so there's no bespoke
 report format to maintain:
 
 ```sh
-# Audit (read-only, safe)
-ansible-playbook ansible/site.yml --tags timesync --check --diff
+# Audit (read-only, safe) — general baseline
+ansible-playbook ansible/configure_rhel.yml --tags timesync --check --diff
 
 # Remediate (modifies the system)
-ansible-playbook ansible/site.yml --tags timesync
+ansible-playbook ansible/configure_rhel.yml --tags timesync
 
-# Everything at once
-ansible-playbook ansible/site.yml --check --diff
+# Everything in the baseline at once
+ansible-playbook ansible/configure_rhel.yml --check --diff
+
+# A purpose-built playbook instead of the general baseline
+ansible-playbook ansible/nfs_client_setup.yml --check --diff
 ```
 
 See `docs/ARCHITECTURE.md` for why `command`/`shell`-based checks needed
@@ -117,9 +153,12 @@ Two ways to trigger one, both work:
   if you want to name the skill yourself.
 
 A typical audit turn: Claude runs
-`ansible-playbook ansible/site.yml --tags timesync --check --diff` against
+`ansible-playbook ansible/configure_rhel.yml --tags timesync --check --diff` against
 the host(s) you named, then summarizes what's compliant and what's
-drifted, in plain language.
+drifted, in plain language. For a host Claude (or you) hasn't touched
+before, it's worth running `ansible-playbook ansible/connect_linux.yml`
+first — it's a fast, read-only check that SSH and `become` actually work
+before anything else is attempted.
 
 ### 3. Ask for a fix — role change vs. host remediation
 
@@ -165,8 +204,8 @@ role for real, same as step 3's "host remediation" case:
 
 ```sh
 git checkout main && git pull
-ansible-playbook ansible/site.yml --tags timesync --check --diff   # confirm the diff first
-ansible-playbook ansible/site.yml --tags timesync                  # then apply
+ansible-playbook ansible/configure_rhel.yml --tags timesync --check --diff   # confirm the diff first
+ansible-playbook ansible/configure_rhel.yml --tags timesync                  # then apply
 ```
 
 Whether that's you running it directly, or asking Claude to run it in a

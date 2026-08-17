@@ -28,7 +28,7 @@ what `--check --diff` reports from the underlying modules, nothing more.
 **Audit** (read-only, safe to run any time):
 
 ```
-ansible-playbook ansible/site.yml --tags system_reboot --check --diff
+ansible-playbook ansible/configure_rhel.yml --tags system_reboot --check --diff
 ```
 
 Summarize the diff output and any failed tasks in plain language.
@@ -38,8 +38,12 @@ first summarize what will change from the `--check --diff` output, then run
 the same command without `--check`:
 
 ```
-ansible-playbook ansible/site.yml --tags system_reboot
+ansible-playbook ansible/configure_rhel.yml --tags system_reboot
 ```
+
+Note this only works at all if `system_reboot` has been uncommented in
+`ansible/configure_rhel.yml`'s `roles:` list first — see "Wiring into the
+SOE" below; by default the tag matches nothing.
 
 **Propose a change to the role itself**: never edit and commit directly. On a
 branch named `soe/system_reboot/<short-desc>`, edit `ansible/roles/system_reboot/`, validate
@@ -58,12 +62,20 @@ body. Then stop — a human reviews and merges; see `docs/ARCHITECTURE.md`'s
 
 ## Wiring into the SOE
 
-This role is deliberately **excluded** from `ansible/site.yml`'s default
-`roles:` list (see the comment above that list, and the "excluded from the
-default run" table in `.claude/skills/soe/SKILL.md`) because it acts
-unconditionally with no guard variable and/or reboots, auto-updates, or
-de-registers the host outright. It only runs when explicitly invoked with
-`--tags system_reboot`, as shown above — never as a side effect of a full SOE
-run. Don't add it back to `ansible/site.yml`'s default list without an
-explicit decision from a human operator; that would be a cross-cutting,
-high-blast-radius change in its own right.
+This role is **not present at all** in `ansible/configure_rhel.yml`'s
+`roles:` list — not even as a commented-out line, unlike most of the
+"opt-in" roles in this repo (see `.claude/skills/soe/SKILL.md`'s "excluded
+from the default run" table) — nor in any of the other playbooks
+(`load_balancer_setup.yml`, `nfs_client_setup.yml`, `nfs_server_setup.yml`,
+`update_rhel.yml`, `connect_linux.yml`). This is deliberate: it acts
+unconditionally with no guard variable, and its entire purpose is to reboot
+the host, so it must never run as a side effect of a routine baseline run.
+
+To actually invoke it, add `- system_reboot` (and any `system_reboot_policy`
+override) directly to `ansible/configure_rhel.yml`'s `roles:` list yourself
+before running the commands above, or write a small dedicated one-off
+playbook — either way, propose it via the branch + PR workflow, and treat
+adding it to `configure_rhel.yml` permanently as a cross-cutting,
+high-blast-radius change needing an explicit human decision, same as it was
+under the old `ansible/site.yml`. This repo no longer uses
+`ansible/site.yml`; see `docs/ARCHITECTURE.md`.

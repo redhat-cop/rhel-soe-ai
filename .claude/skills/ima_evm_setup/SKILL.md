@@ -37,10 +37,17 @@ what `--check --diff` reports from the underlying modules, nothing more.
 
 ## What to do
 
+> **This role is currently commented out** in `ansible/configure_rhel.yml`'s `roles:` list (`#- ima_evm_setup`) and its associated
+> `vars:` block is left at placeholder/empty values. `--tags ima_evm_setup` will report
+> "did not match any tags" until a human operator uncomments the role (and
+> fills in the vars it needs) in `ansible/configure_rhel.yml` — this is a
+> deliberate, host-baseline-scoped opt-in, not a bug. Flag this to the user
+> before assuming the commands below will do anything.
+
 **Audit** (read-only, safe to run any time):
 
 ```
-ansible-playbook ansible/site.yml --tags ima_evm_setup --check --diff
+ansible-playbook ansible/configure_rhel.yml --tags ima_evm_setup --check --diff
 ```
 
 Summarize the diff output and any failed tasks in plain language.
@@ -50,7 +57,7 @@ first summarize what will change from the `--check --diff` output, then run
 the same command without `--check`:
 
 ```
-ansible-playbook ansible/site.yml --tags ima_evm_setup
+ansible-playbook ansible/configure_rhel.yml --tags ima_evm_setup
 ```
 
 **Propose a change to the role itself**: never edit and commit directly. On a
@@ -70,7 +77,10 @@ body. Then stop — a human reviews and merges; see `docs/ARCHITECTURE.md`'s
 
 ## Wiring into the SOE
 
-This role is included in `ansible/site.yml`'s default `roles:` list and has
-a row in `.claude/skills/soe/SKILL.md`'s domain table, so it runs as part of
-both `ansible-playbook ansible/site.yml --tags ima_evm_setup ...` and a full,
-untagged `ansible-playbook ansible/site.yml` run.
+This role has a row in `.claude/skills/soe/SKILL.md`'s domain table, but is
+**commented out** in `ansible/configure_rhel.yml`'s `roles:` list by default
+(`#- ima_evm_setup`) — see the caveat at the top of "What to do" above. It is not
+referenced by any of the other playbooks (`load_balancer_setup.yml`,
+`nfs_client_setup.yml`, `nfs_server_setup.yml`, `update_rhel.yml`,
+`connect_linux.yml`) either. This repo no longer uses `ansible/site.yml`; see
+`docs/ARCHITECTURE.md`.

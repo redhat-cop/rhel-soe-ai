@@ -37,7 +37,7 @@ what `--check --diff` reports from the underlying modules, nothing more.
 **Audit** (read-only, safe to run any time):
 
 ```
-ansible-playbook ansible/site.yml --tags system_update --check --diff
+ansible-playbook ansible/update_rhel.yml --tags system_update --check --diff
 ```
 
 Summarize the diff output and any failed tasks in plain language.
@@ -47,8 +47,13 @@ first summarize what will change from the `--check --diff` output, then run
 the same command without `--check`:
 
 ```
-ansible-playbook ansible/site.yml --tags system_update
+ansible-playbook ansible/update_rhel.yml --tags system_update
 ```
+
+Note this only works if `system_update` has been uncommented in
+`ansible/update_rhel.yml`'s `roles:` list first (it sits directly below
+`system_update_report_pre` there, commented out by default) — see "Wiring
+into the SOE" below; by default the tag matches nothing.
 
 **Propose a change to the role itself**: never edit and commit directly. On a
 branch named `soe/system_update/<short-desc>`, edit `ansible/roles/system_update/`, validate
@@ -71,12 +76,19 @@ body. Then stop — a human reviews and merges; see `docs/ARCHITECTURE.md`'s
 
 ## Wiring into the SOE
 
-This role is deliberately **excluded** from `ansible/site.yml`'s default
-`roles:` list (see the comment above that list, and the "excluded from the
-default run" table in `.claude/skills/soe/SKILL.md`) because it acts
-unconditionally with no guard variable and/or reboots, auto-updates, or
-de-registers the host outright. It only runs when explicitly invoked with
-`--tags system_update`, as shown above — never as a side effect of a full SOE
-run. Don't add it back to `ansible/site.yml`'s default list without an
-explicit decision from a human operator; that would be a cross-cutting,
-high-blast-radius change in its own right.
+This role is **commented out** in both playbooks that mention it:
+`ansible/update_rhel.yml` (`#- system_update`, right after the active
+`system_update_report_pre` — see that role's `SKILL.md`) and
+`ansible/configure_rhel.yml` (`#- system_update`, also commented). It is
+not in any of the other playbooks
+(`load_balancer_setup.yml`/`nfs_client_setup.yml`/`nfs_server_setup.yml`/
+`connect_linux.yml`) at all. This is deliberate: it acts unconditionally
+with no guard variable (`dnf update *`, always) and can reboot the host, so
+it must never run as a side effect of a routine run of either playbook.
+
+Uncomment it in `ansible/update_rhel.yml` (the natural home, alongside its
+pre-update report counterpart) when fleet-wide patching is actually wanted,
+run the commands above, then comment it back out — or propose making that
+change more permanent via the branch + PR workflow if the intent is to
+patch regularly rather than as a one-off. This repo no longer uses
+`ansible/site.yml`; see `docs/ARCHITECTURE.md`.

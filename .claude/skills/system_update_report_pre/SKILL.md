@@ -33,17 +33,17 @@ what `--check --diff` reports from the underlying modules, nothing more.
 **Audit** (read-only, safe to run any time):
 
 ```
-ansible-playbook ansible/site.yml --tags system_update_report_pre --check --diff
+ansible-playbook ansible/update_rhel.yml --tags system_update_report_pre --check --diff
 ```
 
-Summarize the diff output and any failed tasks in plain language.
-
-**Remediate** (modifies the system — only after the user explicitly asks):
-first summarize what will change from the `--check --diff` output, then run
-the same command without `--check`:
+Summarize the diff output and any failed tasks in plain language. Since this
+role never changes anything, `--check` is mostly cosmetic here — the same
+command without `--check` reports the same pending-update list, it's just
+no longer the convention this repo's other roles use, so keep using
+`--check --diff` for consistency:
 
 ```
-ansible-playbook ansible/site.yml --tags system_update_report_pre
+ansible-playbook ansible/update_rhel.yml --tags system_update_report_pre
 ```
 
 **Propose a change to the role itself**: never edit and commit directly. On a
@@ -56,7 +56,9 @@ body. Then stop — a human reviews and merges; see `docs/ARCHITECTURE.md`'s
 
 ## Wiring into the SOE
 
-This role is included in `ansible/site.yml`'s default `roles:` list and has
-a row in `.claude/skills/soe/SKILL.md`'s domain table, so it runs as part of
-both `ansible-playbook ansible/site.yml --tags system_update_report_pre ...` and a full,
-untagged `ansible-playbook ansible/site.yml` run.
+This role has a row in `.claude/skills/soe/SKILL.md`'s domain table. It
+runs as part of `ansible/update_rhel.yml` (active, uncommented, alongside
+`system_update` which stays commented — see that role's `SKILL.md`), not
+the general host baseline: it's absent from `ansible/configure_rhel.yml`
+entirely. This repo no longer uses `ansible/site.yml`; see
+`docs/ARCHITECTURE.md`.

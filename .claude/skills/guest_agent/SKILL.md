@@ -48,7 +48,7 @@ itself.
 
 ## What to do
 
-**Audit**: `ansible-playbook ansible/site.yml --tags guest_agent --check --diff`
+**Audit**: `ansible-playbook ansible/configure_rhel.yml --tags guest_agent --check --diff`
 
 **Remediate**: same command without `--check`, after explicit user
 approval.

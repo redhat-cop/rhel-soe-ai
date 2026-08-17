@@ -35,7 +35,7 @@ what `--check --diff` reports from the underlying modules, nothing more.
 **Audit** (read-only, safe to run any time):
 
 ```
-ansible-playbook ansible/site.yml --tags certificates --check --diff
+ansible-playbook ansible/configure_rhel.yml --tags certificates --check --diff
 ```
 
 Summarize the diff output and any failed tasks in plain language.
@@ -45,7 +45,7 @@ first summarize what will change from the `--check --diff` output, then run
 the same command without `--check`:
 
 ```
-ansible-playbook ansible/site.yml --tags certificates
+ansible-playbook ansible/configure_rhel.yml --tags certificates
 ```
 
 **Propose a change to the role itself**: never edit and commit directly. On a
@@ -65,7 +65,9 @@ body. Then stop — a human reviews and merges; see `docs/ARCHITECTURE.md`'s
 
 ## Wiring into the SOE
 
-This role is included in `ansible/site.yml`'s default `roles:` list and has
-a row in `.claude/skills/soe/SKILL.md`'s domain table, so it runs as part of
-both `ansible-playbook ansible/site.yml --tags certificates ...` and a full,
-untagged `ansible-playbook ansible/site.yml` run.
+This role is included (active, uncommented) in `ansible/configure_rhel.yml`'s
+`roles:` list and has a row in `.claude/skills/soe/SKILL.md`'s domain table, so
+it runs as part of both `ansible-playbook ansible/configure_rhel.yml --tags certificates ...`
+and a full, untagged `ansible-playbook ansible/configure_rhel.yml` run. This repo
+no longer uses `ansible/site.yml` as the baseline entrypoint — see
+`docs/ARCHITECTURE.md`.

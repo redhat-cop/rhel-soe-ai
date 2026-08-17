@@ -30,21 +30,38 @@ what `--check --diff` reports from the underlying modules, nothing more.
 
 ## What to do
 
+This role is **not** in `ansible/configure_rhel.yml`'s `roles:` list at all
+(not even commented out) — it's currently wired in only by the two NFS
+composite playbooks, each setting `files_create` itself rather than relying
+on this role's (empty) defaults. Pick whichever matches the host:
+
+- **NFS client** — `ansible/nfs_client_setup.yml` creates the mount point
+  directory (`nfs_mount_dir`, default `/mnt/remote`).
+- **NFS server** — `ansible/nfs_server_setup.yml` creates the export
+  directory (`nfs_export_dir`, default `/export`).
+
 **Audit** (read-only, safe to run any time):
 
 ```
-ansible-playbook ansible/site.yml --tags files_create --check --diff
+ansible-playbook ansible/nfs_client_setup.yml --tags files_create --check --diff
+ansible-playbook ansible/nfs_server_setup.yml --tags files_create --check --diff
 ```
 
 Summarize the diff output and any failed tasks in plain language.
 
 **Remediate** (modifies the system — only after the user explicitly asks):
 first summarize what will change from the `--check --diff` output, then run
-the same command without `--check`:
+the matching playbook without `--check`:
 
 ```
-ansible-playbook ansible/site.yml --tags files_create
+ansible-playbook ansible/nfs_client_setup.yml --tags files_create
+ansible-playbook ansible/nfs_server_setup.yml --tags files_create
 ```
+
+If a host needs `files_create` for something outside these two scenarios,
+either add it (uncommented, with its own `vars:`) to
+`ansible/configure_rhel.yml`, or write a small dedicated playbook via the
+branch + PR workflow below.
 
 **Propose a change to the role itself**: never edit and commit directly. On a
 branch named `soe/files_create/<short-desc>`, edit `ansible/roles/files_create/`, validate
@@ -56,7 +73,8 @@ body. Then stop — a human reviews and merges; see `docs/ARCHITECTURE.md`'s
 
 ## Wiring into the SOE
 
-This role is included in `ansible/site.yml`'s default `roles:` list and has
-a row in `.claude/skills/soe/SKILL.md`'s domain table, so it runs as part of
-both `ansible-playbook ansible/site.yml --tags files_create ...` and a full,
-untagged `ansible-playbook ansible/site.yml` run.
+This role has a row in `.claude/skills/soe/SKILL.md`'s domain table but is
+**not** part of the general baseline (`ansible/configure_rhel.yml`) — it
+only runs as part of `ansible/nfs_client_setup.yml` or
+`ansible/nfs_server_setup.yml`. This repo no longer uses `ansible/site.yml`;
+see `docs/ARCHITECTURE.md`.

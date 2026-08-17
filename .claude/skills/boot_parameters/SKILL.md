@@ -34,7 +34,7 @@ Encoded in `ansible/roles/boot_parameters/defaults/main.yml`:
 
 ## What to do
 
-**Audit**: `ansible-playbook ansible/site.yml --tags boot_parameters --check --diff`.
+**Audit**: `ansible-playbook ansible/configure_rhel.yml --tags boot_parameters --check --diff`.
 The enable/disable checks use `lineinfile` in `check_mode: true` internally
 (a self-contained probe, not the outer `--check` flag) so they always
 report accurately; the `grubby`/`grub2-mkconfig`/reboot tasks are normal

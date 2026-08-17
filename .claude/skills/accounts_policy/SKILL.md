@@ -37,7 +37,14 @@ the box: every one of these is unset by default.
 
 ## What to do
 
-**Audit**: `ansible-playbook ansible/site.yml --tags accounts_policy --check --diff`.
+> **This role is currently commented out** in `ansible/configure_rhel.yml`'s `roles:` list (`#- accounts_policy`) and its associated
+> `vars:` block is left at placeholder/empty values. `--tags accounts_policy` will report
+> "did not match any tags" until a human operator uncomments the role (and
+> fills in the vars it needs) in `ansible/configure_rhel.yml` — this is a
+> deliberate, host-baseline-scoped opt-in, not a bug. Flag this to the user
+> before assuming the commands below will do anything.
+
+**Audit**: `ansible-playbook ansible/configure_rhel.yml --tags accounts_policy --check --diff`.
 Note: the `authselect current`/`authselect check` steps are
 `command` tasks — they run under `--check` (marked `check_mode: false`) so
 drift there is still visible, but the `authselect select` task itself is a

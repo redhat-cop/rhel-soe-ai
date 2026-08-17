@@ -28,7 +28,14 @@ plus several commented-out optional entries (`ltrace`, `numactl`, `perf`,
 
 ## What to do
 
-**Audit**: `ansible-playbook ansible/site.yml --tags troubleshooting_tools --check --diff`.
+> **This role is currently commented out** in `ansible/configure_rhel.yml`'s `roles:` list (`#- troubleshooting_tools`) and its associated
+> `vars:` block is left at placeholder/empty values. `--tags troubleshooting_tools` will report
+> "did not match any tags" until a human operator uncomments the role (and
+> fills in the vars it needs) in `ansible/configure_rhel.yml` — this is a
+> deliberate, host-baseline-scoped opt-in, not a bug. Flag this to the user
+> before assuming the commands below will do anything.
+
+**Audit**: `ansible-playbook ansible/configure_rhel.yml --tags troubleshooting_tools --check --diff`.
 Read the `dnf` task's own `--diff` output for which packages are
 missing — there's no separate "Missing baseline packages: ..." summary
 message; the module's diff output is the source of truth.

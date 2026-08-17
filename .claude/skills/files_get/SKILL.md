@@ -32,20 +32,29 @@ what `--check --diff` reports from the underlying modules, nothing more.
 
 ## What to do
 
-**Audit** (read-only, safe to run any time):
+This role is **not referenced by any playbook in `ansible/`** right now —
+not `configure_rhel.yml` (not even commented out), not
+`load_balancer_setup.yml`/`nfs_client_setup.yml`/`nfs_server_setup.yml`/
+`update_rhel.yml`. There is currently no `ansible-playbook` command that will
+invoke `files_get` in this repo. Before running it, either:
+
+1. **Add it to an existing playbook** — most often
+   `ansible/configure_rhel.yml`'s `roles:` list (uncomment-style, with a
+   `vars:` entry for `files_get` set to what's actually needed), if what's wanted is
+   a permanent, repeatable part of the host baseline; or
+2. **Write a small ad hoc playbook** for the one-off task, same shape as
+   `ansible/load_balancer_setup.yml`/`ansible/nfs_client_setup.yml` (a
+   `vars:` block plus a `roles: [files_get]` list), if it's a one-time or
+   host-class-specific job that doesn't belong in the general baseline.
+
+Either way, propose it via the branch + PR workflow below rather than running
+an untracked local playbook against a real host. Once wired in, audit/remediate
+the same way as any other role — `--tags files_get` against whichever playbook now
+contains it, `--check --diff` first:
 
 ```
-ansible-playbook ansible/site.yml --tags files_get --check --diff
-```
-
-Summarize the diff output and any failed tasks in plain language.
-
-**Remediate** (modifies the system — only after the user explicitly asks):
-first summarize what will change from the `--check --diff` output, then run
-the same command without `--check`:
-
-```
-ansible-playbook ansible/site.yml --tags files_get
+ansible-playbook ansible/<playbook>.yml --tags files_get --check --diff   # audit
+ansible-playbook ansible/<playbook>.yml --tags files_get                  # remediate
 ```
 
 **Propose a change to the role itself**: never edit and commit directly. On a
@@ -65,7 +74,8 @@ body. Then stop — a human reviews and merges; see `docs/ARCHITECTURE.md`'s
 
 ## Wiring into the SOE
 
-This role is included in `ansible/site.yml`'s default `roles:` list and has
-a row in `.claude/skills/soe/SKILL.md`'s domain table, so it runs as part of
-both `ansible-playbook ansible/site.yml --tags files_get ...` and a full,
-untagged `ansible-playbook ansible/site.yml` run.
+This role has a row in `.claude/skills/soe/SKILL.md`'s domain table, but (see
+"What to do" above) is not currently included in any playbook in this repo —
+neither the general baseline (`ansible/configure_rhel.yml`) nor any of the
+composite playbooks. This repo no longer uses `ansible/site.yml`; see
+`docs/ARCHITECTURE.md`.

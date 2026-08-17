@@ -42,7 +42,7 @@ Encoded in `ansible/roles/audit_setup/defaults/main.yml`:
 
 ## What to do
 
-**Audit**: `ansible-playbook ansible/site.yml --tags audit_setup --check --diff`.
+**Audit**: `ansible-playbook ansible/configure_rhel.yml --tags audit_setup --check --diff`.
 The `augenrules --check` and `auditctl -s` reads are `command` tasks marked
 `check_mode: false`, so they run and report real state under `--check`.
 

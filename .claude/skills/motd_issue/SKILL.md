@@ -21,7 +21,14 @@ are unset by default, so out of the box this role does nothing:
 
 ## What to do
 
-**Audit**: `ansible-playbook ansible/site.yml --tags motd_issue --check --diff`
+> **This role is currently commented out** in `ansible/configure_rhel.yml`'s `roles:` list (`#- motd_issue`) and its associated
+> `vars:` block is left at placeholder/empty values. `--tags motd_issue` will report
+> "did not match any tags" until a human operator uncomments the role (and
+> fills in the vars it needs) in `ansible/configure_rhel.yml` — this is a
+> deliberate, host-baseline-scoped opt-in, not a bug. Flag this to the user
+> before assuming the commands below will do anything.
+
+**Audit**: `ansible-playbook ansible/configure_rhel.yml --tags motd_issue --check --diff`
 
 **Remediate**: same command without `--check`, after explicit user
 approval.

@@ -30,21 +30,24 @@ what `--check --diff` reports from the underlying modules, nothing more.
 
 ## What to do
 
-**Audit** (read-only, safe to run any time):
+**NFS client hosts** — `ansible/nfs_client_setup.yml` sets
+`mount_setup_enable` for `nfs_mount_src`/`nfs_mount_dir` and is the normal
+way to run this role:
 
 ```
-ansible-playbook ansible/site.yml --tags mount_setup --check --diff
+ansible-playbook ansible/nfs_client_setup.yml --tags mount_setup --check --diff   # audit
+ansible-playbook ansible/nfs_client_setup.yml --tags mount_setup                  # remediate
 ```
 
-Summarize the diff output and any failed tasks in plain language.
+Summarize the diff output and any failed tasks in plain language, and only
+drop `--check` after the user explicitly asks.
 
-**Remediate** (modifies the system — only after the user explicitly asks):
-first summarize what will change from the `--check --diff` output, then run
-the same command without `--check`:
-
-```
-ansible-playbook ansible/site.yml --tags mount_setup
-```
+**Any other host** — the role is present but **commented out** in
+`ansible/configure_rhel.yml`'s `roles:` list (`#- mount_setup`); it's a
+no-op there today. Uncomment it and set `mount_setup_enable`/
+`mount_setup_disable` for that host/group before
+`ansible-playbook ansible/configure_rhel.yml --tags mount_setup` will do
+anything.
 
 **Propose a change to the role itself**: never edit and commit directly. On a
 branch named `soe/mount_setup/<short-desc>`, edit `ansible/roles/mount_setup/`, validate
@@ -56,7 +59,9 @@ body. Then stop — a human reviews and merges; see `docs/ARCHITECTURE.md`'s
 
 ## Wiring into the SOE
 
-This role is included in `ansible/site.yml`'s default `roles:` list and has
-a row in `.claude/skills/soe/SKILL.md`'s domain table, so it runs as part of
-both `ansible-playbook ansible/site.yml --tags mount_setup ...` and a full,
-untagged `ansible-playbook ansible/site.yml` run.
+This role has a row in `.claude/skills/soe/SKILL.md`'s domain table. It's
+active by default only via `ansible/nfs_client_setup.yml`; it's present but
+**commented out** in `ansible/configure_rhel.yml`'s `roles:` list, so a
+plain, untagged `ansible-playbook ansible/configure_rhel.yml` run does not
+touch mounts on a general-purpose host. This repo no longer uses
+`ansible/site.yml`; see `docs/ARCHITECTURE.md`.
