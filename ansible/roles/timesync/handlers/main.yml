@@ -1,0 +1,5 @@
+---
+- name: Restart chronyd
+  ansible.builtin.service:
+    name: "{{ soe_timesync_service }}"
+    state: restarted

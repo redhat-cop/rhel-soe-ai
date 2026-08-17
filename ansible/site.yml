@@ -1,0 +1,17 @@
+---
+- name: Apply the Linux Standard Operating Environment baseline
+  hosts: all
+  become: true
+  roles:
+    - accounts_policy
+    - audit_setup
+    - boot_parameters
+    - cron_setup
+    - vm_guest_agent
+    - motd_issue
+    - system_keyboard
+    - system_locale
+    - timesync
+    - timezone
+    - troubleshooting_tools
+    - usbguard_setup

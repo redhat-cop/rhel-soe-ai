@@ -1,0 +1,46 @@
+---
+- name: Install cronie
+  ansible.builtin.package:
+    name: "{{ soe_cron_package }}"
+    state: present
+  tags: [cron_setup]
+
+- name: Ensure crond is enabled and running
+  ansible.builtin.service:
+    name: "{{ soe_cron_service }}"
+    enabled: true
+    state: started
+  tags: [cron_setup]
+
+- name: Ensure /etc/cron.allow exists with the approved user list
+  ansible.builtin.copy:
+    dest: /etc/cron.allow
+    content: "{{ (soe_cron_allowed_users | join('\n')) + '\n' }}"
+    owner: root
+    group: root
+    mode: "0600"
+  tags: [cron_setup]
+
+- name: Ensure /etc/cron.deny does not exist
+  ansible.builtin.file:
+    path: /etc/cron.deny
+    state: absent
+  tags: [cron_setup]
+
+- name: Find group/world-writable cron paths
+  # find errors out hard if any listed path is missing, so filter to paths
+  # that actually exist on this host before searching them.
+  ansible.builtin.shell: >
+    existing=""; for p in /etc/cron.d /etc/crontab /etc/cron.hourly
+    /etc/cron.daily /etc/cron.weekly /etc/cron.monthly; do [ -e "$p" ] &&
+    existing="$existing $p"; done; [ -n "$existing" ] && find $existing -perm -go+w; true
+  register: soe_cron_writable
+  changed_when: false
+  check_mode: false
+  tags: [cron_setup]
+
+- name: Assert no group/world-writable cron paths
+  ansible.builtin.assert:
+    that: soe_cron_writable.stdout == ""
+    fail_msg: "Group/world-writable cron paths found: {{ soe_cron_writable.stdout_lines }}"
+  tags: [cron_setup]

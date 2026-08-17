@@ -1,0 +1,68 @@
+---
+- name: Install usbguard
+  ansible.builtin.package:
+    name: "{{ soe_usbguard_package }}"
+    state: present
+  tags: [usbguard_setup]
+
+- name: Enforce ImplicitPolicyTarget in usbguard-daemon.conf
+  ansible.builtin.lineinfile:
+    path: /etc/usbguard/usbguard-daemon.conf
+    regexp: "^ImplicitPolicyTarget="
+    line: "ImplicitPolicyTarget={{ soe_usbguard_implicit_policy_target }}"
+    create: true
+    mode: "0644"
+  tags: [usbguard_setup]
+
+- name: Check whether a rules.conf policy already exists
+  ansible.builtin.stat:
+    path: /etc/usbguard/rules.conf
+  register: soe_usbguard_rules_stat
+  tags: [usbguard_setup]
+
+- name: Generate an initial allow-list from currently connected devices
+  ansible.builtin.command: usbguard generate-policy
+  register: soe_usbguard_generated_policy
+  changed_when: false
+  check_mode: false
+  when: not soe_usbguard_rules_stat.stat.exists
+  tags: [usbguard_setup]
+
+- name: Write generated policy to rules.conf
+  ansible.builtin.copy:
+    dest: /etc/usbguard/rules.conf
+    content: "{{ soe_usbguard_generated_policy.stdout }}\n"
+    owner: root
+    group: root
+    mode: "0600"
+  when: not soe_usbguard_rules_stat.stat.exists
+  tags: [usbguard_setup]
+
+- name: Ensure rules.conf permissions are correct
+  ansible.builtin.file:
+    path: /etc/usbguard/rules.conf
+    owner: root
+    group: root
+    mode: "0600"
+  when: soe_usbguard_rules_stat.stat.exists
+  tags: [usbguard_setup]
+
+- name: Enable and start usbguard (only when explicitly requested)
+  ansible.builtin.service:
+    name: "{{ soe_usbguard_service }}"
+    enabled: true
+    state: started
+  when: soe_usbguard_manage_service
+  tags: [usbguard_setup]
+
+- name: Warn that usbguard is installed but not yet enabled
+  ansible.builtin.debug:
+    msg: >-
+      usbguard is installed and rules.conf is in place, but the service was
+      NOT enabled/started because soe_usbguard_manage_service is false.
+      Review /etc/usbguard/rules.conf on the target host first — a
+      default-block policy without an HID allow rule can lock out a
+      physically-connected keyboard/mouse. Set
+      soe_usbguard_manage_service: true explicitly once reviewed.
+  when: not soe_usbguard_manage_service
+  tags: [usbguard_setup]

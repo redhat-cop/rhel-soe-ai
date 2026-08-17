@@ -1,0 +1,42 @@
+---
+- name: Detect virtualization type
+  ansible.builtin.command: systemd-detect-virt
+  register: soe_vm_detect
+  changed_when: false
+  failed_when: false
+  check_mode: false
+  tags: [vm_guest_agent]
+
+- name: Report bare metal (no guest agent expected)
+  ansible.builtin.debug:
+    msg: "Bare metal detected ({{ soe_vm_detect.stdout }}); no guest agent required."
+  when: soe_vm_detect.stdout == "none"
+  tags: [vm_guest_agent]
+
+- name: Install and enable the guest agent matching the detected hypervisor
+  when: soe_vm_detect.stdout in soe_vm_guest_agent_map
+  vars:
+    soe_vm_agent: "{{ soe_vm_guest_agent_map[soe_vm_detect.stdout] }}"
+  tags: [vm_guest_agent]
+  block:
+    - name: Install guest agent package
+      ansible.builtin.package:
+        name: "{{ soe_vm_agent.package }}"
+        state: present
+
+    - name: Enable and start guest agent service
+      ansible.builtin.service:
+        name: "{{ soe_vm_agent.service }}"
+        enabled: true
+        state: started
+
+- name: Report unmapped virtualization type
+  ansible.builtin.debug:
+    msg: >-
+      Virtualization type '{{ soe_vm_detect.stdout }}' has no entry in
+      soe_vm_guest_agent_map (e.g. a public cloud platform) — defer to that
+      provider's own guest agent / cloud-init guidance rather than guessing.
+  when:
+    - soe_vm_detect.stdout != "none"
+    - soe_vm_detect.stdout not in soe_vm_guest_agent_map
+  tags: [vm_guest_agent]

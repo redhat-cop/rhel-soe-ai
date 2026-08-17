@@ -1,0 +1,38 @@
+---
+# Boot parameter changes only take effect on next boot, and a bad edit to
+# GRUB_CMDLINE_LINUX can leave a host unbootable or without console access.
+# This role deliberately only *audits* the kernel command line — actually
+# changing it is a manual, reviewed step (see this role's SKILL.md).
+#
+# Audited against /proc/cmdline (the running kernel's actual parameters)
+# rather than GRUB_CMDLINE_LINUX in /etc/default/grub, since the latter is
+# only what *will* apply on the next boot — a host can be out of compliance
+# right now even with a correct pending config (e.g. edited but not yet
+# rebuilt/rebooted), and that drift is what this audit needs to catch.
+
+- name: Read current kernel boot parameters
+  ansible.builtin.command: cat {{ soe_boot_cmdline_path }}
+  register: soe_boot_cmdline
+  changed_when: false
+  check_mode: false
+  tags: [boot_parameters]
+
+- name: Assert no forbidden boot parameters are present
+  ansible.builtin.assert:
+    that: item not in soe_boot_cmdline.stdout
+    fail_msg: >-
+      Forbidden boot parameter present on the running kernel cmdline:
+      {{ item }}. Remove it from GRUB_CMDLINE_LINUX in
+      {{ soe_boot_grub_default }}, run grub2-mkconfig, and reboot.
+  loop: "{{ soe_boot_forbidden_params }}"
+  tags: [boot_parameters]
+
+- name: Assert required boot parameters are present
+  ansible.builtin.assert:
+    that: item in soe_boot_cmdline.stdout
+    fail_msg: >-
+      Required boot parameter missing from the running kernel cmdline:
+      {{ item }}. Add it to GRUB_CMDLINE_LINUX in {{ soe_boot_grub_default }},
+      run grub2-mkconfig, and reboot.
+  loop: "{{ soe_boot_required_params }}"
+  tags: [boot_parameters]

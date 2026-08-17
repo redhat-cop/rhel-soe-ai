@@ -1,0 +1,11 @@
+---
+galaxy_info:
+  author: soe-ai
+  role_name: motd_issue
+  description: /etc/motd and /etc/issue* login banner baseline for the Linux SOE.
+  license: Apache-2.0
+  min_ansible_version: "2.14"
+  platforms:
+    - name: EL
+      versions: ["all"]
+dependencies: []

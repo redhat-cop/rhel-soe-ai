@@ -1,0 +1,13 @@
+---
+galaxy_info:
+  author: soe-ai
+  role_name: boot_parameters
+  description: >-
+    Audits GRUB/kernel boot command-line parameters for the Linux SOE.
+    Audit-only by design — see tasks/main.yml for why.
+  license: Apache-2.0
+  min_ansible_version: "2.14"
+  platforms:
+    - name: EL
+      versions: ["all"]
+dependencies: []

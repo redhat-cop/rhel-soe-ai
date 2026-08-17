@@ -1,0 +1,8 @@
+---
+soe_audit_package: audit
+soe_audit_service: auditd
+soe_audit_max_log_file_action: rotate
+soe_audit_space_left_action: syslog
+soe_audit_admin_space_left_action: syslog
+soe_audit_max_log_file: 50
+soe_audit_num_logs: 5

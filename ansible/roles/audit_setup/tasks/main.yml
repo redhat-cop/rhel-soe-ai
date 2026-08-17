@@ -1,0 +1,42 @@
+---
+- name: Install audit package
+  ansible.builtin.package:
+    name: "{{ soe_audit_package }}"
+    state: present
+  tags: [audit_setup]
+
+- name: Enforce auditd.conf settings
+  ansible.builtin.lineinfile:
+    path: /etc/audit/auditd.conf
+    regexp: "^{{ item.key }}\\s*="
+    line: "{{ item.key }} = {{ item.value }}"
+    create: true
+    mode: "0640"
+  loop:
+    - { key: max_log_file_action, value: "{{ soe_audit_max_log_file_action }}" }
+    - { key: space_left_action, value: "{{ soe_audit_space_left_action }}" }
+    - { key: admin_space_left_action, value: "{{ soe_audit_admin_space_left_action }}" }
+    - { key: max_log_file, value: "{{ soe_audit_max_log_file }}" }
+    - { key: num_logs, value: "{{ soe_audit_num_logs }}" }
+  notify: Restart auditd
+  tags: [audit_setup]
+
+- name: Check for at least one custom audit rules file
+  ansible.builtin.find:
+    paths: /etc/audit/rules.d
+    patterns: "*.rules"
+  register: soe_audit_rules_files
+  tags: [audit_setup]
+
+- name: Assert audit rules are present
+  ansible.builtin.assert:
+    that: soe_audit_rules_files.matched > 0
+    fail_msg: "No audit rules found under /etc/audit/rules.d/ — add the org-approved rule set, then run 'augenrules --load'."
+  tags: [audit_setup]
+
+- name: Ensure auditd is enabled and running
+  ansible.builtin.service:
+    name: "{{ soe_audit_service }}"
+    enabled: true
+    state: started
+  tags: [audit_setup]

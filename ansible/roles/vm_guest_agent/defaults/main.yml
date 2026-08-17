@@ -1,0 +1,11 @@
+---
+soe_vm_guest_agent_map:
+  kvm:
+    package: qemu-guest-agent
+    service: qemu-guest-agent
+  vmware:
+    package: open-vm-tools
+    service: vmtoolsd
+  microsoft:
+    package: hyperv-daemons
+    service: hypervkvpd

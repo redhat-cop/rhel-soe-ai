@@ -1,0 +1,44 @@
+---
+- name: List locales available on this system
+  ansible.builtin.command: localectl list-locales
+  register: soe_locale_available
+  changed_when: false
+  check_mode: false
+  tags: [system_locale]
+
+- name: Assert target locale is installed
+  ansible.builtin.assert:
+    that: soe_locale_lang in soe_locale_available.stdout_lines
+    fail_msg: "{{ soe_locale_lang }} is not installed; install the matching glibc-langpack-* package first."
+  tags: [system_locale]
+
+# localectl has no "show"/--property machine-readable output, so read the
+# canonical config file directly rather than parsing free-text status.
+- name: Get current system locale
+  ansible.builtin.command: grep '^LANG=' /etc/locale.conf
+  register: soe_locale_current
+  changed_when: false
+  failed_when: false
+  check_mode: false
+  tags: [system_locale]
+
+- name: Set system locale
+  ansible.builtin.command: localectl set-locale LANG={{ soe_locale_lang }}
+  when: soe_locale_current.stdout != 'LANG=' + soe_locale_lang
+  changed_when: true
+  tags: [system_locale]
+
+- name: Find LANG/LC_* overrides outside locale.conf
+  ansible.builtin.shell:
+    cmd: set -o pipefail && grep -RE '^(LANG|LC_[A-Z]+)=' /etc/environment /etc/profile.d/*.sh 2>/dev/null || true
+    executable: /bin/bash
+  register: soe_locale_overrides
+  changed_when: false
+  check_mode: false
+  tags: [system_locale]
+
+- name: Report conflicting locale overrides for manual review
+  ansible.builtin.debug:
+    msg: "Locale overrides found outside locale.conf (review, not auto-removed): {{ soe_locale_overrides.stdout_lines }}"
+  when: soe_locale_overrides.stdout != ""
+  tags: [system_locale]

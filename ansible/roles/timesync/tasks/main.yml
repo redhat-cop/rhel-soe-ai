@@ -1,0 +1,48 @@
+---
+- name: Assert host is RHEL-family
+  ansible.builtin.assert:
+    that: ansible_facts['os_family'] == "RedHat"
+    fail_msg: >-
+      timesync targets RHEL-family systems; detected {{ ansible_facts['os_family'] }}.
+      Adjust soe_timesync_package/conf_path for this distro before relying
+      on this role.
+  tags: [timesync]
+
+- name: Install chrony
+  ansible.builtin.package:
+    name: "{{ soe_timesync_package }}"
+    state: present
+  tags: [timesync]
+
+- name: Ensure the baseline NTP pools/servers are configured
+  ansible.builtin.lineinfile:
+    path: "{{ soe_timesync_conf_path }}"
+    regexp: "^pool {{ item | regex_escape() }}$"
+    line: "pool {{ item }}"
+    insertafter: EOF
+    create: true
+    mode: "0644"
+  loop: "{{ soe_timesync_pools }}"
+  notify: Restart chronyd
+  tags: [timesync]
+
+- name: Ensure chronyd is enabled and running
+  ansible.builtin.service:
+    name: "{{ soe_timesync_service }}"
+    enabled: true
+    state: started
+  tags: [timesync]
+
+- name: Check whether the system clock is synchronized
+  ansible.builtin.command: timedatectl show --property=NTPSynchronized --value
+  register: soe_timesync_ntp_sync
+  changed_when: false
+  check_mode: false
+  tags: [timesync]
+
+- name: Assert the system clock is synchronized
+  ansible.builtin.assert:
+    that: soe_timesync_ntp_sync.stdout == "yes"
+    fail_msg: "System clock is not synchronized yet — this can take a few minutes after chronyd starts; re-run the audit shortly before treating it as drift."
+    success_msg: "System clock is synchronized"
+  tags: [timesync]

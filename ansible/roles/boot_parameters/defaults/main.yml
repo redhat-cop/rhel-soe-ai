@@ -1,0 +1,13 @@
+---
+# Audit source: the *running* kernel's actual cmdline, not the pending
+# GRUB config — see tasks/main.yml for why.
+soe_boot_cmdline_path: /proc/cmdline
+# Referenced only in remediation guidance below (where a fix belongs).
+soe_boot_grub_default: /etc/default/grub
+soe_boot_required_params:
+  - crashkernel
+soe_boot_forbidden_params:
+  - mitigations=off
+  - nopti
+  - nospectre_v2
+  - "init=/bin/bash"

@@ -1,0 +1,4 @@
+---
+soe_keyboard_vc_keymap: us
+soe_keyboard_x11_layout: us
+soe_keyboard_manage_x11: false

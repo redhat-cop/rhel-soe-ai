@@ -1,0 +1,5 @@
+---
+soe_cron_package: cronie
+soe_cron_service: crond
+soe_cron_allowed_users:
+  - root
