@@ -1,6 +1,0 @@
----
-soe_timesync_package: chrony
-soe_timesync_service: chronyd
-soe_timesync_conf_path: /etc/chrony.conf
-soe_timesync_pools:
-  - se.pool.ntp.org iburst

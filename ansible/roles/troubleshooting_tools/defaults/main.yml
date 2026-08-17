@@ -1,9 +1,0 @@
----
-soe_troubleshooting_packages:
-  - sos
-  - tcpdump
-  - strace
-  - lsof
-  - bind-utils
-  - nmap-ncat
-  - iotop

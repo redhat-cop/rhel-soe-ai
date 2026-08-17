@@ -1,7 +1,0 @@
----
-soe_motd_content: |
-  Authorized uses only. All activity may be monitored and reported.
-soe_issue_content: |
-  Authorized uses only. All activity may be monitored and reported.
-soe_sshd_banner_path: /etc/issue.net
-soe_sshd_manage_banner: true

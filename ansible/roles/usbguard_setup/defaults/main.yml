@@ -1,9 +1,0 @@
----
-soe_usbguard_package: usbguard
-soe_usbguard_service: usbguard
-soe_usbguard_implicit_policy_target: block
-# Enabling default-block USB policy can lock out a physically-connected
-# keyboard/mouse if rules.conf doesn't already allow HID devices. This role
-# installs usbguard and prepares its policy but does NOT enable the service
-# unless this is explicitly set to true.
-soe_usbguard_manage_service: false
