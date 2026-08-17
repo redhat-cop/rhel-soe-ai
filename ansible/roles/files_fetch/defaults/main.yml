@@ -1,0 +1,11 @@
+---
+# List of files and directories to fetch
+# Uses ansible.builtin.fetch module
+# NB. With 'become' this is going to
+#     be very slow with large files!
+# Registers variable: fetch_files
+files_fetch:
+#  - src: /tmp/log.txt
+#    dest: /tmp/log-{{ inventory_hostname }}.txt
+#    flat: true
+#    validate_checksum: false

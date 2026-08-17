@@ -1,0 +1,37 @@
+---
+packages_install:
+  - acl
+  - bash-completion
+  - bind-utils
+  - curl
+  - dnf-plugins-core
+  #-git-core
+  - man-pages
+  #- mokutil
+  #- mlocate
+  - nano
+  - openssh-clients
+  #- perl-interpreter
+  - psmisc
+  - python3
+  - python3-libselinux
+  - policycoreutils-python-utils
+  #- rsync
+  #- sos
+  - tar
+  #- tmux
+  #- unzip
+  #- vim-enhanced
+  #- wget
+  - xz
+  - zstd
+
+# List of dnf excludes
+packages_install_exclude:
+#  - emacs
+
+# Enable or disable dnf module 'install_weak_deps' parameter
+packages_install_weak_deps: true
+
+# Display results on output
+packages_install_display_results: false
