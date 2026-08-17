@@ -1,0 +1,74 @@
+---
+name: service_state
+description: Maintains the ansible/roles/service_state Ansible role that masks/unmasks, enables/disables, and restarts/reloads systemd units by declarative lists, as part of the Linux SOE. Use when checking or fixing which services should be running, stopped, or masked.
+---
+
+# service_state
+
+Maintains `ansible/roles/service_state/`. See `docs/ARCHITECTURE.md` for the shared
+conventions (role layout, audit vs. remediate via `--check --diff`, safety
+rules, branch + PR contribution workflow).
+
+## What the role actually does
+
+Encoded in `ansible/roles/service_state/defaults/main.yml`:
+
+- Four independent lists, all defaulting empty:
+  `service_state_mask`/`_unmask`/`_disable`/`_enable`, plus
+  `service_state_restart` (restart by default per entry, or `state: reloaded`
+  with an optional `require:` precondition on current state).
+- `sshd`/`sshd.service` are hard-excluded from mask and disable/stop
+  regardless of what's listed — the role won't let you lock out SSH access to
+  itself.
+- An item in both `service_state_mask` and `service_state_unmask`, or both
+  `service_state_disable` and `service_state_enable`, resolves to
+  "unmask"/"enable" winning.
+- `service_state_skip_missing` (default `false`) — an enable/start entry for a
+  unit that doesn't exist fails the role by default; set `true` to skip it
+  instead.
+
+This role is sourced from the myllynen/rhel-ansible-roles import
+(see `git log -- ansible/roles/service_state`) rather than hand-authored for this
+repo. Unlike the original reference domains (e.g. `timesync`, `usbguard_setup`),
+it applies state declaratively via standard Ansible modules and does **not**
+add its own `assert`-based drift checks on top — an audit here is exactly
+what `--check --diff` reports from the underlying modules, nothing more.
+
+## What to do
+
+**Audit** (read-only, safe to run any time):
+
+```
+ansible-playbook ansible/site.yml --tags service_state --check --diff
+```
+
+Summarize the diff output and any failed tasks in plain language.
+
+**Remediate** (modifies the system — only after the user explicitly asks):
+first summarize what will change from the `--check --diff` output, then run
+the same command without `--check`:
+
+```
+ansible-playbook ansible/site.yml --tags service_state
+```
+
+**Propose a change to the role itself**: never edit and commit directly. On a
+branch named `soe/service_state/<short-desc>`, edit `ansible/roles/service_state/`, validate
+locally (`--syntax-check`, `ansible-lint roles/service_state/`, and
+`--check --diff` against a real/test host if available), then push and open a
+PR titled `[service_state] <what changed>` with the `--check --diff` output in the
+body. Then stop — a human reviews and merges; see `docs/ARCHITECTURE.md`'s
+"Contribution workflow".
+
+## Notes
+
+- Masking a unit prevents even manual `systemctl start` until unmasked —
+  confirm the mask list doesn't include anything another role in this repo
+  (e.g. `usbguard_setup`, `audit_setup`) depends on being startable.
+
+## Wiring into the SOE
+
+This role is included in `ansible/site.yml`'s default `roles:` list and has
+a row in `.claude/skills/soe/SKILL.md`'s domain table, so it runs as part of
+both `ansible-playbook ansible/site.yml --tags service_state ...` and a full,
+untagged `ansible-playbook ansible/site.yml` run.

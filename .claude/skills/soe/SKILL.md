@@ -25,12 +25,64 @@ Ansible role under `ansible/roles/`. This skill runs `ansible/site.yml`
 | `timesync` | Thin wrapper around the external `redhat.rhel_system_roles.timesync` collection role |
 | `troubleshooting_tools` | Baseline troubleshooting package set + optional PCP metrics |
 | `usbguard_setup` | USBGuard device authorization — **service enablement is NOT opt-in**, on by default with `policy: reject` |
+| `accounts_local` | Local (non-domain) user/group create/delete, passwords, sudoers, SSH keys |
+| `certificates` | CA trust store (anchors/blocklist/extended-format) via update-ca-trust |
+| `dns_cache` | Local DNS caching via dnsmasq/systemd-resolved/nscd — disabled by default |
+| `domain_ad` | AD domain join/leave via realmd/adcli + sssd/authselect — no-op until a domain is set |
+| `etc_hosts` | Full, exclusive rewrite of `/etc/hosts`; rebuilds initramfs on change |
+| `files_acl` | POSIX ACL entries on arbitrary paths — list-driven, empty by default |
+| `files_copy` | Copies files/renders templates to arbitrary destinations — empty by default |
+| `files_create` | Creates directories/files/symlinks with ownership/mode — empty by default |
+| `files_fetch` | Pulls files from managed hosts to the control node — empty by default |
+| `files_get` | Downloads files onto managed hosts via URL — empty by default |
+| `files_properties` | Sets ownership/mode on existing paths — empty by default |
+| `files_remove` | Removes files/dirs by path or glob — **destructive footgun, see its SKILL.md** |
+| `files_unarchive` | Extracts archives to a destination — empty by default |
+| `firewall` | Basic firewalld enable/zone/ports — explicitly defers to `system_roles.firewall` for more |
+| `ima_evm_setup` | IMA/EVM file-integrity appraisal — RHEL 9.7+ only, untouched (`null`) by default |
+| `ipv6_setup` | IPv6 enable/disable via sysctl + grubby + NM — **reboots on change, no opt-out flag** |
+| `mount_setup` | Mount/unmount via `/etc/fstab` (local, NFS, CIFS) — empty by default |
+| `multipath_setup` | device-mapper-multipath config — **reboots by default** (`multipath_setup_reboot: true`) |
+| `packages_install` | Baseline dnf package set (distinct from `troubleshooting_tools`'s list) |
+| `packages_remove` | dnf package denylist removal — small default list, cross-checked against `packages_install` |
+| `packages_verify` | rpm-level package verification (missing/modified files) — audit-only by default |
+| `performance_tuning` | Active `tuned` profile — defaults already branch on guest vs. bare metal |
+| `repository_setup` | yum.repos.d files + RHSM registration/repo enablement |
+| `rescue_image` | Kernel rescue image generation toggle — disabled by default |
+| `resolver_configuration` | How `/etc/resolv.conf` is populated (nm/direct/symlink/remove/nothing) |
+| `root_password` | Root account password — no-op until `root_password` is set (vault) |
+| `scap_compliance` | OpenSCAP oscap scan — **`scap_compliance_remediate` (a role var, not `--check`) gates changes** |
+| `scap_satellite` | OpenSCAP scan via Satellite/Capsule-defined policies — reports only, no remediation |
+| `sebooleans` | SELinux boolean enable/disable — empty by default |
+| `security_hardening` | Secure Boot/FIPS verification (audit-only, can fail run), kernel lockdown, SELinux mode, crypto policy |
+| `service_state` | systemd mask/unmask/enable/disable/restart by list — `sshd` is hard-protected |
+| `shell_profile` | System-wide shell profile template — unset by default |
+| `splunk_forwarder` | Splunk universal forwarder deployment-server + local user config |
+| `sshd_configuration` | Declarative sshd_config options, validated with `sshd -t` before applying |
+| `system_coredump` | systemd-coredump enable + size cap — disabled by default |
+| `system_hostname` | `/etc/hostname` — defaults to the host's own current FQDN fact |
+| `timezone` | System timezone via `community.general.timezone` — default `UTC` |
+| `watchdog` | systemd hardware/software watchdog timeouts — enabled by default (`60s` runtime only) |
 
-There is no `timezone` role in this repository — only `timesync` (NTP sync
-health), which does not manage the system timezone setting itself. If the
-user asks about timezone specifically, say so rather than assuming
-`timesync` covers it, and treat adding a `timezone` role as a "new domain"
-proposal (see below).
+Four more roles exist under `ansible/roles/` but are **not in
+`ansible/site.yml`'s default list at all** (tag-invocable only, never run by
+an untagged `ansible-playbook ansible/site.yml`), because each acts
+unconditionally with no guard variable and/or reboots/auto-updates/
+de-registers the host outright:
+
+| Skill / role | Domain | Why excluded from the default run |
+|---|---|---|
+| `system_init` | Post-install cleanup (reboot + syslog message) | README says explicitly optional, one-time use — not a repeatable baseline check |
+| `system_reboot` | Reboots per policy (`never`/`when_needed`/`always`) | Its entire purpose is to reboot the host |
+| `system_unregister` | Unregisters from RHSM + Red Hat Insights | Runs **unconditionally**, no guard variable — would de-register every host on every full run |
+| `system_update` | `dnf update *` on everything | Runs **unconditionally**, no guard variable — fleet-wide auto-patching needs an explicit decision, not a default |
+
+All 43 of the roles above `accounts_local`…`watchdog`/`timezone`, plus these
+four, were bulk-imported from myllynen/rhel-ansible-roles
+(`git log -- ansible/roles/<name>`) rather than hand-authored for this repo,
+and — unlike the original reference domains — don't add their own
+`assert`-based drift checks on top of what their Ansible modules already
+report via `--check --diff`.
 
 ## What to do
 
@@ -66,6 +118,21 @@ disruptively on their own:
 - `audit_setup` can also reboot the host if
   `audit_setup_update_lock: reboot` is set and the current rules are
   locked.
+- `ipv6_setup` **reboots on change with no opt-out flag** (unlike
+  `boot_parameters`/`system_locale`, there's no `-e` to suppress it).
+- `multipath_setup` reboots by default (`multipath_setup_reboot: true`)
+  rather than reloading `multipathd` in place.
+- `scap_compliance` remediates (not just audits) whenever
+  `scap_compliance_remediate: true` is set on the host/group, **regardless
+  of whether `--check` is passed** — confirm that variable's value before
+  assuming `--check --diff` is safe against it.
+
+`system_init`, `system_reboot`, `system_unregister`, and `system_update`
+are not in the roles list at all (see the table above) specifically so a
+full `ansible-playbook ansible/site.yml` run can never auto-reboot,
+auto-update, or de-register a host as a side effect — invoke each
+individually and deliberately with `--tags <name>` only when that specific
+action is actually wanted.
 
 Prefer remediating one domain at a time
 (`ansible-playbook ansible/site.yml --tags <domain>`) with the user's
