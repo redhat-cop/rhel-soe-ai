@@ -14,18 +14,23 @@ Ansible role under `ansible/roles/`. This skill runs `ansible/site.yml`
 
 | Skill / role | Domain |
 |---|---|
-| `accounts_policy` | Local account/password policy |
-| `audit_setup` | auditd configuration and rules |
-| `boot_parameters` | GRUB/kernel command line baseline (audit-only) |
-| `cron_setup` | cron service and access control |
-| `vm_guest_agent` | Guest agent for the detected hypervisor |
-| `motd_issue` | `/etc/motd` and `/etc/issue*` banners |
-| `system_keyboard` | Console/X11 keyboard layout |
-| `system_locale` | System locale (`LANG`, etc.) |
-| `timesync` | NTP/chrony time synchronization |
-| `timezone` | System timezone |
-| `troubleshooting_tools` | Baseline troubleshooting package set |
-| `usbguard_setup` | USBGuard device authorization policy (service enablement is opt-in) |
+| `accounts_policy` | Local account/login/PAM/authselect config (deploys config files; no built-in drift assertions) |
+| `audit_setup` | auditd install + config/rules deployment; can fail or reboot on locked-rules conflicts |
+| `boot_parameters` | GRUB/kernel command-line via grubby — **remediates and can reboot by default**, not audit-only |
+| `cron_setup` | cron service, cron.allow/cron.deny, and declarative crontab entries |
+| `guest_agent` | Guest agent for the detected hypervisor (role dir is `guest_agent`, not `vm_guest_agent`) |
+| `motd_issue` | `/etc/motd(.d)` and `/etc/issue.d`/`/etc/issue.net` banners — does not manage the sshd banner |
+| `system_keyboard` | Virtual console keymap + font (no X11 handling) |
+| `system_locale` | System locale — restricted to `C.UTF-8`/`en_US.UTF-8`/`auto`, **reboots by default** on change |
+| `timesync` | Thin wrapper around the external `redhat.rhel_system_roles.timesync` collection role |
+| `troubleshooting_tools` | Baseline troubleshooting package set + optional PCP metrics |
+| `usbguard_setup` | USBGuard device authorization — **service enablement is NOT opt-in**, on by default with `policy: reject` |
+
+There is no `timezone` role in this repository — only `timesync` (NTP sync
+health), which does not manage the system timezone setting itself. If the
+user asks about timezone specifically, say so rather than assuming
+`timesync` covers it, and treat adding a `timezone` role as a "new domain"
+proposal (see below).
 
 ## What to do
 
@@ -35,9 +40,11 @@ Ansible role under `ansible/roles/`. This skill runs `ansible/site.yml`
 ansible-playbook ansible/site.yml --check --diff
 ```
 
-Summarize per-role: which roles reported no diff/no failed asserts
-(compliant), which showed diffs (drift found, not yet applied), and which
-failed an `assert` (a check that can't be auto-fixed — read the `fail_msg`).
+Summarize per-role: which roles reported no diff (compliant vs. their
+current variable settings — note several roles, e.g. `accounts_policy`
+and `motd_issue`, do nothing at all until their template/content
+variables are set), which showed diffs (drift found, not yet applied),
+and which failed a task outright.
 
 **To audit one domain**: add `--tags <domain>`, e.g.
 `ansible-playbook ansible/site.yml --tags timesync --check --diff`.
@@ -45,28 +52,36 @@ failed an `assert` (a check that can't be auto-fixed — read the `fail_msg`).
 **To remediate**: never run the full playbook without `--check` across all
 domains unless the user has explicitly asked to apply fixes fleet-wide —
 this touches auth, boot config, and device policy in one pass (high blast
-radius). Prefer remediating one domain at a time
-(`ansible-playbook ansible/site.yml --tags <domain>`) with the user's
-confirmation of what will change, per `docs/ARCHITECTURE.md`. Two roles
-need extra care even then:
+radius), and at least two of these roles can act immediately and
+disruptively on their own:
 
-- `usbguard_setup` only enables the service when
-  `soe_usbguard_manage_service: true` is set — leave this off unless the
-  user has reviewed `/etc/usbguard/rules.conf` on the target host.
-- `boot_parameters` is audit-only; there is no remediate step to run — a
-  failed assert there needs a manual, reviewed GRUB edit and a reboot.
+- `usbguard_setup` enables and starts enforcement **by default**
+  (`policy: reject`, no opt-in flag) — see that skill's `SKILL.md` before
+  remediating any host with only physical console access.
+- `boot_parameters` and `system_locale` both **reboot the host by
+  default** (`boot_parameters_reboot` / `system_locale_reboot`) when they
+  change something — get explicit confirmation before a real remediate
+  run, or pass `-e boot_parameters_reboot=false -e system_locale_reboot=false`
+  if the user wants changes applied without an immediate reboot.
+- `audit_setup` can also reboot the host if
+  `audit_setup_update_lock: reboot` is set and the current rules are
+  locked.
+
+Prefer remediating one domain at a time
+(`ansible-playbook ansible/site.yml --tags <domain>`) with the user's
+confirmation of what will change, per `docs/ARCHITECTURE.md`.
 
 **To target real hosts**: add them to `ansible/inventory/hosts.ini` (or
 pass `-i <path>`); the playbook defaults to `hosts: all` with
 `become: true`.
 
 **To propose a change spanning multiple roles or `ansible/site.yml`
-itself** (e.g. adding a new domain, changing execution order): this is the
-one case that doesn't belong to a single domain skill. Same rules as every
-domain's "propose a change" workflow apply — never commit directly, branch
-as `soe/<short-desc>` (no domain prefix, since it's cross-cutting), validate
-locally, push, open a PR titled `[soe] <what changed>`, then stop for human
-review. Don't fold a cross-cutting change into a single domain's PR — see
+itself**: this is the one case that doesn't belong to a single domain
+skill. Same rules as every domain's "propose a change" workflow apply —
+never commit directly, branch as `soe/<short-desc>` (no domain prefix,
+since it's cross-cutting), validate locally, push, open a PR titled
+`[soe] <what changed>`, then stop for human review. Don't fold a
+cross-cutting change into a single domain's PR — see
 `docs/ARCHITECTURE.md`'s "Contribution workflow".
 
 ## Adding a domain

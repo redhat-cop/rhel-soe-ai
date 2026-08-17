@@ -1,6 +1,6 @@
 ---
 name: motd_issue
-description: Maintains the ansible/roles/motd_issue Ansible role that audits and remediates /etc/motd and /etc/issue* banner files (plus the sshd pre-auth banner) on RHEL-family systems as part of the Linux SOE. Use when checking or standardizing login banners or checking for information disclosure in pre-auth banners.
+description: Maintains the ansible/roles/motd_issue Ansible role that deploys /etc/motd (or /etc/motd.d on RHEL 9+) and /etc/issue.d + /etc/issue.net from role-provided templates on RHEL-family systems as part of the Linux SOE. Use when checking or standardizing login banners. Does NOT manage the sshd pre-auth banner.
 ---
 
 # motd_issue
@@ -8,15 +8,16 @@ description: Maintains the ansible/roles/motd_issue Ansible role that audits and
 Maintains `ansible/roles/motd_issue/`. See `docs/ARCHITECTURE.md` for the
 shared conventions.
 
-## Baseline
+## What the role actually does
 
-Encoded in `ansible/roles/motd_issue/defaults/main.yml`:
+Encoded in `ansible/roles/motd_issue/defaults/main.yml` — both variables
+are unset by default, so out of the box this role does nothing:
 
-- `/etc/motd`, `/etc/issue`, `/etc/issue.net` all match the org's approved
-  banner text (`soe_motd_content` / `soe_issue_content`), mode `0644`,
-  owned `root:root`.
-- If `soe_sshd_manage_banner` is true (default), `sshd_config` has
-  `Banner /etc/issue.net` set so the SSH pre-auth banner matches too.
+- `issue_template` (if set) → rendered to **both**
+  `/etc/issue.d/zz-ansible.issue` and `/etc/issue.net` (the same template,
+  same content, two destinations).
+- `motd_template` (if set) → rendered to `/etc/motd.d/zz-ansible.motd` on
+  RHEL 9+, or directly to `/etc/motd` on RHEL 8.
 
 ## What to do
 
@@ -25,8 +26,8 @@ Encoded in `ansible/roles/motd_issue/defaults/main.yml`:
 **Remediate**: same command without `--check`, after explicit user
 approval.
 
-**Propose a change to the role itself** (e.g. updating the approved banner
-text): never commit directly. On a branch named
+**Propose a change to the role itself** (e.g. adding the org's approved
+banner template): never commit directly. On a branch named
 `soe/motd_issue/<short-desc>`, edit the role, validate locally
 (`--syntax-check`, `ansible-lint roles/motd_issue/`, `--check --diff`),
 push, and open a PR titled `[motd_issue] <what changed>` with the
@@ -35,13 +36,17 @@ push, and open a PR titled `[motd_issue] <what changed>` with the
 
 ## Notes
 
-- The default banner text is a placeholder — replace
-  `soe_motd_content`/`soe_issue_content` with the org's actual approved
-  legal/warning banner before relying on this role.
-- The approved banner should not contain systemd's `\v`/`\r`/`\m`/`\s`
-  escape sequences in `/etc/issue`/`/etc/issue.net` — those leak
-  kernel/OS version to an unauthenticated user at the pre-auth banner.
-- The sshd `Banner` edit is applied via `lineinfile`'s `validate: sshd -t
-  -f %s`, so a malformed result is rejected before it's written — an
-  invalid `sshd_config` can lock out remote access, so this is validated
-  before being applied, not after.
+- **This role does not touch `sshd_config` or the SSH pre-auth banner.**
+  If the org needs the SSH pre-auth banner (`Banner` directive) to match
+  `/etc/issue.net`, that's a gap in the role today, not something already
+  handled — flag it rather than assuming it's covered.
+- Neither `motd_template` nor `issue_template` has role-provided
+  alternatives shipped in `files/`/`templates/` (unlike `accounts_policy`
+  or `audit_setup`) — the org's banner content has to be supplied
+  entirely externally (a template path outside this role, or a new file
+  added to the role first).
+- If the approved banner text is supplied, avoid `\v`/`\r`/`\m`/`\s`
+  escape sequences in the issue content — those leak kernel/OS version to
+  an unauthenticated user at the pre-auth banner (this is a property of
+  `/etc/issue`/`/etc/issue.net` content itself, not something the role
+  enforces).

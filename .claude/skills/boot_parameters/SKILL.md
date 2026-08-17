@@ -1,52 +1,54 @@
 ---
 name: boot_parameters
-description: Maintains the ansible/roles/boot_parameters Ansible role that audits GRUB/kernel boot command-line parameters on RHEL-family systems as part of the Linux SOE (audit-only — no automated remediation). Use when checking or hardening kernel boot parameters.
+description: Maintains the ansible/roles/boot_parameters Ansible role that enables/disables GRUB kernel command-line parameters via grubby, sets the boot timeout and optional bootloader password, and can reboot the host to apply changes, on RHEL-family systems as part of the Linux SOE. Use when checking or changing kernel boot parameters. NOT audit-only — remediation is automatic and can trigger a reboot.
 ---
 
 # boot_parameters
 
 Maintains `ansible/roles/boot_parameters/`. See `docs/ARCHITECTURE.md` for
-the shared conventions. **This role is audit-only by design** — see
-"Notes" below.
+the shared conventions. **This role remediates and can reboot the host —
+it is not audit-only.**
 
-## Baseline
+## What the role actually does
 
 Encoded in `ansible/roles/boot_parameters/defaults/main.yml`:
 
-- Required on the kernel cmdline: `crashkernel` (reserves memory for kdump
-  so a kernel crash produces a vmcore for post-mortem analysis).
-- Forbidden unless explicitly approved: `mitigations=off`, `nopti`,
-  `nospectre_v2`, `init=/bin/bash`.
-
-The role reads the **running kernel's** actual parameters from
-`/proc/cmdline` (not `GRUB_CMDLINE_LINUX` in `/etc/default/grub`) and
-asserts required params are present / forbidden params are absent. This
-catches real drift that a pending-but-unapplied `GRUB_CMDLINE_LINUX` edit
-would hide — e.g. someone edited the file but hasn't run `grub2-mkconfig`
-and rebooted yet, so the live kernel is still out of compliance.
+- Installs `grubby`; ensures `/etc/default/grub` exists.
+- `boot_parameters_enable` (default `[quiet]`) / `boot_parameters_disable`
+  (default `[debug, rhgb]`): checked against `GRUB_CMDLINE_LINUX` in
+  `/etc/default/grub` (**not** the running kernel's `/proc/cmdline**), and
+  if anything's missing/present-that-shouldn't-be, applies via `grubby
+  --update-kernel=ALL --args=... --remove-args=...` for **all** installed
+  kernels.
+- `boot_parameters_timeout` (default `1`): sets `GRUB_TIMEOUT` via a
+  straight `replace`, unconditionally, every run, as long as it's an
+  integer ≥ 1.
+- `boot_parameters_password` (unset by default): if set, writes a
+  `GRUB2_PASSWORD=...` file to `user.cfg` (path depends on BIOS/UEFI and
+  RHEL major version); if explicitly set falsy, removes that file.
+- Regenerates the boot config with `grub2-mkconfig` whenever the timeout,
+  password file, or password removal changed.
+- **If `boot_parameters_reboot: true` (the default) and the `grubby`
+  command changed anything, reboots the host immediately** — no separate
+  confirmation gate inside the role itself.
 
 ## What to do
 
-**Audit** (the only mode this role supports):
+**Audit**: `ansible-playbook ansible/site.yml --tags boot_parameters --check --diff`.
+The enable/disable checks use `lineinfile` in `check_mode: true` internally
+(a self-contained probe, not the outer `--check` flag) so they always
+report accurately; the `grubby`/`grub2-mkconfig`/reboot tasks are normal
+tasks and will correctly no-op/simulate under the outer `--check`.
 
-```
-ansible-playbook ansible/site.yml --tags boot_parameters --check --diff
-```
+**Remediate**: same command without `--check`. Because
+`boot_parameters_reboot` defaults to `true`, running this without
+`--check` and without first setting `boot_parameters_reboot: false` **can
+reboot the target host as soon as any enable/disable parameter changes**
+— always get explicit user confirmation before a real remediate run, and
+default to `-e boot_parameters_reboot=false` if the user wants the change
+applied but the reboot deferred to a manual, reviewed window.
 
-A failed `assert` names the specific missing/forbidden parameter and tells
-the user exactly what to edit.
-
-**Remediation is manual**, not automated by this role:
-
-1. Edit `GRUB_CMDLINE_LINUX` in `/etc/default/grub`.
-2. Regenerate: `grub2-mkconfig -o /boot/grub2/grub.cfg` (BIOS) or the
-   UEFI-specific output path for that host — get this path right, a wrong
-   path silently does nothing.
-3. Tell the user a **reboot is required** for the change to take effect,
-   and do not reboot the host without their explicit confirmation.
-
-**Propose a change to the role itself** (e.g. adding/removing a
-required/forbidden parameter to the baseline): never commit directly. On a
+**Propose a change to the role itself**: never commit directly. On a
 branch named `soe/boot_parameters/<short-desc>`, edit the role, validate
 locally (`--syntax-check`, `ansible-lint roles/boot_parameters/`,
 `--check --diff`), push, and open a PR titled
@@ -54,10 +56,18 @@ locally (`--syntax-check`, `ansible-lint roles/boot_parameters/`,
 body — then stop for human review. See `docs/ARCHITECTURE.md`'s
 "Contribution workflow".
 
-## Notes
+## Notes — read before touching this role
 
-- Boot parameter changes are high blast-radius: a bad `GRUB_CMDLINE_LINUX`
-  edit can leave a host unbootable or without console access, and the
-  effect is invisible until the next reboot. That's why this role only
-  asserts state instead of attempting an automated fix — see
-  `docs/ARCHITECTURE.md`'s "Safety conventions".
+- This is the highest-blast-radius role in the SOE alongside
+  `usbguard_setup`: a bad `boot_parameters_enable`/`_disable` entry can
+  leave a host that fails to boot, and the role's default behavior is to
+  apply the grubby change **and reboot in the same run** — there is no
+  built-in "propose only" mode. Treat `boot_parameters_reboot: true`
+  remediate runs the same way you'd treat any other host-impacting change
+  requiring explicit approval.
+- `GRUB_TIMEOUT` is rewritten every single run regardless of whether it
+  already matches — this task has no idempotent "only if different" guard
+  beyond the `replace` module's own no-op-if-unchanged behavior, so
+  `boot_config`/timeout diffs will show even when nothing meaningfully
+  changed if the file didn't already contain a `GRUB_TIMEOUT=` line in the
+  expected form.

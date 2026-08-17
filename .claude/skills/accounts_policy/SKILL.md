@@ -1,35 +1,52 @@
 ---
 name: accounts_policy
-description: Maintains the ansible/roles/accounts_policy Ansible role that audits and remediates local account and password policy (aging, complexity, UID ranges, empty passwords, sudoers hygiene) on RHEL-family systems as part of the Linux SOE. Use when checking or hardening local user account policy.
+description: Maintains the ansible/roles/accounts_policy Ansible role that deploys local account, login, PAM, and password-quality configuration (login.defs, pwquality.conf, faillock.conf, limits.conf, authselect profile) on RHEL-family systems as part of the Linux SOE. Use when checking or changing local account/authentication policy.
 ---
 
 # accounts_policy
 
 Maintains `ansible/roles/accounts_policy/`. See `docs/ARCHITECTURE.md` for
-the shared conventions (role layout, audit vs. remediate, safety rules) and
-`timesync`'s `SKILL.md` for the fullest-documented example of this pattern.
+the shared conventions (role layout, `--check --diff`, safety rules).
 
-## Baseline
+## What the role actually does
 
-Encoded in `ansible/roles/accounts_policy/defaults/main.yml`:
+This role does **not** assert individual policy values (e.g. it never
+checks "is `PASS_MAX_DAYS` 90?"). It deploys whole config files from
+role-provided templates/files, each independently optional — any variable
+left unset in `defaults/main.yml` means that file is left untouched:
 
-- Password aging in `/etc/login.defs`: `PASS_MAX_DAYS`, `PASS_MIN_DAYS`,
-  `PASS_WARN_AGE` (defaults 90/1/7).
-- Password quality via `/etc/security/pwquality.conf`
-  (`soe_accounts_pwquality`: `minlen`, `dcredit`, `ucredit`, `lcredit`,
-  `ocredit`).
-- No accounts with empty passwords (detected via `/etc/shadow`).
-- No duplicate UIDs.
-- `/etc/sudoers` and `/etc/sudoers.d/*` are mode `0440`
-  (`soe_accounts_sudoers_paths`).
+- `useradd_defaults_file` → `/etc/default/useradd`
+- `login_defs_config_file` → `/etc/login.defs`
+- `login_access_config_file` → `/etc/security/access.conf`
+- `faillock_config_file` → `/etc/security/faillock.conf`
+- `pwhistory_config_file` → `/etc/security/pwhistory.conf`
+- `pwquality_config_file` → `/etc/security/pwquality.conf`
+- `limits_config_file` → `/etc/security/limits.conf`
+- `user_resource_limits` (list) → `/etc/security/limits.d/95-ansible.conf`
+- `system_auth_profile` (+ `system_auth_profile_parameters`) → installs
+  `authselect`, optionally copies a `custom/*` profile to
+  `/etc/authselect/custom`, and runs `authselect select -f <profile>
+  <parameters>` if the currently-selected profile doesn't match
+- `system_auth_pam_d_su_file` → `/etc/pam.d/su`
+
+Each variable's docstring in `defaults/main.yml` lists the role-provided
+template alternatives (e.g. `login_defs_config_file` can be
+`login.defs_cis_rhel89.j2`, `login.defs_rhel_rhel8.j2`, etc. — pick per
+RHEL major version and compliance target). Nothing is configured out of
+the box: every one of these is unset by default.
 
 ## What to do
 
-**Audit**: `ansible-playbook ansible/site.yml --tags accounts_policy --check --diff`
+**Audit**: `ansible-playbook ansible/site.yml --tags accounts_policy --check --diff`.
+Note: the `authselect current`/`authselect check` steps are
+`command` tasks — they run under `--check` (marked `check_mode: false`) so
+drift there is still visible, but the `authselect select` task itself is a
+normal `command` and is skipped under `--check`, so a check run won't show
+its own diff.
 
 **Remediate**: same command without `--check`, only after explicit user
-approval — this role edits `login.defs`, `pwquality.conf`, and sudoers file
-permissions on the target host.
+approval and after confirming which template/profile variables are
+actually set — an unset variable is a no-op, not a "use defaults" signal.
 
 **Propose a change to the role itself**: never commit directly. On a
 branch named `soe/accounts_policy/<short-desc>`, edit the role, validate
@@ -39,20 +56,15 @@ locally (`--syntax-check`, `ansible-lint roles/accounts_policy/`,
 body — then stop for human review. See `docs/ARCHITECTURE.md`'s
 "Contribution workflow".
 
-## Notes — things this role deliberately does NOT auto-fix
+## Notes
 
-- **Password aging (`PASS_MAX_DAYS`/`PASS_MIN_DAYS`/`PASS_WARN_AGE`)** is
-  enforced via `/etc/login.defs`, which `useradd` only reads at
-  account-creation time — this baseline applies to *newly created* accounts
-  going forward, not retroactively to existing ones. Existing accounts'
-  aging lives in `/etc/shadow` per-user and needs `chage`, which (like
-  locking an account) is a per-account judgment call this role doesn't
-  make automatically.
-- **Empty-password accounts** and **duplicate UIDs** are reported via
-  `assert` (task fails, `fail_msg` lists the accounts/UIDs) but never
-  auto-locked or auto-renumbered — locking (`usermod -L`) or fixing a UID
-  is a judgment call on a specific account, not a safe blanket action.
-- **`NOPASSWD:ALL` sudoers entries** are reported for review
-  (`ansible.builtin.debug`) but never removed automatically.
-- Sudoers edits made manually (not by this role) should always go through
-  `visudo -c` — a syntax error in sudoers can lock out `sudo` entirely.
+- This role has no built-in drift detection for password aging, empty
+  passwords, duplicate UIDs, or `NOPASSWD:ALL` sudoers entries — none of
+  that is checked or reported. If that kind of auditing is needed, it has
+  to be added to the role first (propose via the branch/PR workflow), not
+  assumed to already happen.
+- `system_auth_profile_parameters` is a raw string appended to `authselect
+  select`, e.g. `with-mkhomedir with-pamaccess` — get this right, a typo'd
+  parameter is silently accepted by `authselect` in some cases.
+- Sudoers edits made manually (not by this role — this role doesn't touch
+  sudoers at all) should always go through `visudo -c`.
