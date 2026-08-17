@@ -1,0 +1,120 @@
+---
+- name: Gather needed facts
+  ansible.builtin.setup:
+    gather_subset:
+      - '!all'
+      - '!min'
+      - cmdline
+  when: ansible_facts.cmdline is not defined
+
+- name: Verify correct role configuration
+  ansible.builtin.assert:
+    that:
+      - audit_setup_update_lock in ['fail', 'ignore', 'reboot']
+    quiet: true
+
+- name: Fail if audit disabled in kernel
+  ansible.builtin.fail:
+    msg: "Audit disabled on kernel command line."
+  when:
+    - "'audit' in ansible_facts.cmdline"
+    - ansible_facts.cmdline['audit'] == '0' or
+      ansible_facts.cmdline['audit'] == 'off'
+
+- name: Install audit package
+  ansible.builtin.dnf:
+    name: audit
+    state: present
+
+- name: Gather package facts
+  ansible.builtin.package_facts:
+
+- name: Copy auditd configuration file
+  ansible.builtin.copy:
+    src: "{{ audit_setup_config_file }}"
+    dest: /etc/audit/auditd.conf
+    mode: '0640'
+  register: auditd_config
+  when:
+    - audit_setup_config_file is not none
+    - audit_setup_config_file | length > 0
+
+- name: Copy audit rules configuration file
+  ansible.builtin.copy:
+    src: "{{ audit_setup_rules_file }}"
+    dest: /etc/audit/rules.d/zz-ansible.rules
+    mode: '0600'
+  when:
+    - audit_setup_rules_file is not none
+    - audit_setup_rules_file | length > 0
+
+- name: Remove unrecognized audit rules files
+  vars:
+    self_config: /etc/audit/rules.d/zz-ansible.rules
+    files_remove:
+      - /etc/audit/rules.d/*
+    files_remove_exclude: "{{ [self_config] + audit_setup_files_known | select }}"
+  ansible.builtin.include_role:
+    name: files_remove
+  when: audit_setup_exclusive | bool
+
+- name: Check changed audit rules
+  check_mode: false
+  ansible.builtin.command: augenrules --check
+  register: rules_status
+  changed_when: false
+  when: "'audit' in ansible_facts.packages"
+
+- name: Check locked audit rules
+  check_mode: false
+  ansible.builtin.command: auditctl -s
+  register: audit_status
+  changed_when: false
+  when: "'audit' in ansible_facts.packages"
+
+- name: Fail if audit rules cannot be updated
+  ansible.builtin.fail:
+    msg: "Audit rules are locked."
+  when:
+    - "'audit' in ansible_facts.packages"
+    - audit_setup_update_lock == 'fail'
+    - "'enabled 2' in audit_status.stdout"
+    - "'Rules have changed' in rules_status.stdout"
+
+- name: Enable auditd service
+  ansible.builtin.service:
+    name: auditd
+    enabled: true
+  when: "'audit' in ansible_facts.packages"
+
+- name: Start auditd service
+  ansible.builtin.service:
+    name: auditd
+    state: started
+  register: service_start
+  when: "'audit' in ansible_facts.packages"
+
+# auditd is not compatible with the Ansible service module
+# https://github.com/ansible/ansible/issues/22171
+# https://access.redhat.com/solutions/2664811
+- name: Reload auditd to apply configuration changes
+  # noqa: command-instead-of-module
+  ansible.builtin.command: service auditd reload
+  changed_when: true
+  when:
+    - "'audit' in ansible_facts.packages"
+    - "'enabled 2' not in audit_status.stdout or
+      (auditd_config is changed and 'Rules have changed' not in rules_status.stdout)"
+    - "'enabled 2' not in audit_status.stdout or
+      audit_setup_update_lock != 'reboot'"
+    - service_start is not changed
+    - auditd_config is changed or
+      'Rules have changed' in rules_status.stdout
+
+- name: Reboot system
+  ansible.builtin.reboot:
+  when:
+    - "'audit' in ansible_facts.packages"
+    - audit_setup_update_lock == 'reboot'
+    - "'enabled 2' in audit_status.stdout"
+    - "'Rules have changed' in rules_status.stdout"
