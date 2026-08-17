@@ -1,0 +1,34 @@
+name: Ansible CI
+
+on:
+  pull_request:
+    paths:
+      - 'ansible/**'
+      - '.github/workflows/ansible-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'ansible/**'
+
+jobs:
+  syntax-and-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Ansible and ansible-lint
+        run: pip install --disable-pip-version-check ansible-core ansible-lint
+
+      - name: Syntax check
+        working-directory: ansible
+        run: ansible-playbook site.yml --syntax-check
+
+      - name: Lint roles and playbook
+        working-directory: ansible
+        run: ansible-lint roles/ site.yml
