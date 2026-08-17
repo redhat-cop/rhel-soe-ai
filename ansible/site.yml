@@ -7,7 +7,7 @@
     - audit_setup
     - boot_parameters
     - cron_setup
-    - vm_guest_agent
+    - guest_agent
     - motd_issue
     - system_keyboard
     - system_locale
