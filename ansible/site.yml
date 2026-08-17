@@ -12,6 +12,5 @@
     - system_keyboard
     - system_locale
     - timesync
-    - timezone
     - troubleshooting_tools
     - usbguard_setup
