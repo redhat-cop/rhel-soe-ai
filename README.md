@@ -10,6 +10,10 @@ There is **no single top-level playbook** that runs every domain. Roles are
 triggered through six purpose-scoped playbooks instead — see "Playbook
 layout" below.
 
+# Original author of Ansible roles: Marko Myllynen
+This experimentation repository has straight off copied the work of Marko Myllynens Ansible RHEL roles.
+That work, which this repository depends on so very heavily, is available here: https://github.com/myllynen/rhel-ansible-roles/
+
 ## Layout
 
 ```
