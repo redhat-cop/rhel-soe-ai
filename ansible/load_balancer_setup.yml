@@ -3,8 +3,6 @@
   hosts: all
   become: true
   gather_facts: true
-  collections:
-    - myllynen.rhel_ansible_roles
   vars:
     # haproxy template configuration
     # ...

@@ -54,6 +54,75 @@ abstract. See `.claude/skills/soe/SKILL.md` for the full role-to-playbook
 mapping, including which roles are opt-in (commented out by default) and
 which aren't wired into any playbook at all yet.
 
+## Collections vs. local roles
+
+This repo's `ansible/galaxy.yml` declares this content as an installable
+collection under the identity `myllynen.rhel_ansible_roles` — the same
+identity as the actual upstream repo (`myllynen/rhel-ansible-roles`) these
+roles were originally bulk-imported from. That identity is unchanged by
+design; don't rename it without a deliberate, separate decision, since
+other consumers may already reference roles by that FQCN.
+
+That shared identity has a real consequence for local development,
+confirmed by testing: **when a play declares a `collections:` keyword
+naming a collection, Ansible resolves bare role names against that
+collection *before* `roles_path` or a playbook-adjacent `roles/`
+directory** — not as a fallback if local resolution fails, but
+unconditionally, for every bare role name in that play, including ones
+reached indirectly via `include_role`/`import_role` from inside another
+role. If `myllynen.rhel_ansible_roles` happens to be installed on the
+machine running `ansible-playbook` (e.g. because it was manually installed
+as a collection, or `-r requirements.yml` was run against a version of
+that file that named this repo as a dependency), a play that declares
+`collections: [myllynen.rhel_ansible_roles]` will silently run the
+*installed* copy of a role instead of the one sitting in
+`ansible/roles/<domain>/` right next to the playbook — with no error and
+no indication anything was skipped. A role a Claude Code skill just edited
+would appear to validate cleanly under `--check --diff` while actually
+exercising old, previously-installed code; after merge, nothing about
+running the playbook again from `main` would pick up the change either,
+since the installed collection was never consulted in the first place.
+
+Because of this, `configure_rhel.yml`, `load_balancer_setup.yml`,
+`nfs_client_setup.yml`, `nfs_server_setup.yml`, and `update_rhel.yml`
+**do not** declare a play-level `collections:` keyword for
+`myllynen.rhel_ansible_roles`. Bare role names in these playbooks — both
+the top-level `roles:` list and any role-calling-role `include_role`
+inside them (e.g. `audit_setup`/`certificates`/`sshd_configuration`/
+`usbguard_setup` each pull in `files_remove` this way) — always resolve
+via `ansible.cfg`'s `roles_path`, i.e. the checkout's own
+`ansible/roles/`, regardless of whether `myllynen.rhel_ansible_roles`
+happens to be installed on the machine. This was verified directly: the
+same role name present both locally and in an installed collection
+resolves to the local copy with the `collections:` keyword absent, and to
+the installed copy with it present — with everything else held constant.
+
+The one legitimate use of an external collection role in this repo is
+`timesync`'s `include_role: name: redhat.rhel_system_roles.timesync` — a
+**fully-qualified** name (`namespace.collection.role`), which resolves
+directly to whatever collection provides it and was never affected by the
+play-level `collections:` keyword either way. `ansible/requirements.yml`
+lists the actual external collections these roles depend on at runtime —
+`ansible.posix`, `community.general`, `redhat.rhel_system_roles` —
+install with `ansible-galaxy collection install -r requirements.yml`.
+It deliberately does **not** list `myllynen.rhel_ansible_roles` (or this
+repo itself) as a dependency, for the reason above.
+
+If something outside this repo does need to consume these roles via their
+collection identity directly (e.g. a separate playbook elsewhere written
+against `myllynen.rhel_ansible_roles.<role>` FQCNs), installing this repo
+as that collection is still supported —
+`ansible-galaxy collection install git+https://github.com/redhat-cop/rhel-soe-ai,main`
+works and installs under that identity, same as before. Just know that
+doing so on a machine that also runs this repo's own six playbooks now has
+no effect on them one way or the other (by design, per above) — and that
+collections are static snapshots: merging a role change to `main` doesn't
+update an already-installed collection copy anywhere it's in use. Picking
+up a merged change through that path means re-running the install command
+with `--force` (plain reinstall can no-op, since `galaxy.yml` pins a
+static `version: "3.4.10"` that Galaxy may consider already satisfied
+regardless of how far `main` has moved).
+
 ## Target platform
 
 First-class support targets RHEL-family systems (RHEL, CentOS Stream,
@@ -175,6 +244,12 @@ directly:
    - `ansible-playbook <playbook>.yml --tags <domain> --check --diff` against a
      real or test host if one is available, to see the actual drift/diff
      the change produces
+
+   These playbooks resolve roles from the checkout's own `ansible/roles/`
+   regardless of whether `myllynen.rhel_ansible_roles` is also installed
+   as a collection on the machine — see "Collections vs. local roles"
+   above for why that matters here specifically: it's what makes this
+   validation step trustworthy in the first place.
 4. **Commit** with a message explaining why, not just what.
 5. **Push and open a PR**:
    - Title: `[<domain>] <what changed>`

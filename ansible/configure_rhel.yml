@@ -3,8 +3,6 @@
   hosts: all
   become: true
   gather_facts: false
-  collections:
-    - myllynen.rhel_ansible_roles
   vars:
     #
     # accounts_local

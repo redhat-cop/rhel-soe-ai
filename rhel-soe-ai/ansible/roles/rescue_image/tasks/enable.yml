@@ -1,5 +1,0 @@
----
-- name: Install dracut-config-rescue package
-  ansible.builtin.dnf:
-    name: dracut-config-rescue
-    state: present

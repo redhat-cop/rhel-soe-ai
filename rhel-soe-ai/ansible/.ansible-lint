@@ -1,9 +1,0 @@
----
-# Project convention: role variables use a shared `soe_<role>_` prefix
-# (e.g. soe_timesync_pools) rather than ansible-lint's default
-# `<role>_` prefix expectation, so it's obvious at a glance that a
-# variable is managed by this SOE project across all its roles. This is
-# a deliberate, documented choice (see docs/ARCHITECTURE.md), not an
-# oversight — hence the skip below instead of a rename.
-skip_list:
-  - var-naming[no-role-prefix]

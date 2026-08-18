@@ -10,10 +10,6 @@ There is **no single top-level playbook** that runs every domain. Roles are
 triggered through six purpose-scoped playbooks instead — see "Playbook
 layout" below.
 
-# Original author of Ansible roles: Marko Myllynen
-This experimentation repository has straight off copied the work of Marko Myllynens Ansible RHEL roles.
-That work, which this repository depends on so very heavily, is available here: https://github.com/myllynen/rhel-ansible-roles/
-
 ## Layout
 
 ```
@@ -130,6 +126,13 @@ custom MCP server or plugin involved.
   `ansible-playbook --syntax-check` / `--check --diff` locally before
   proposing a change. `pip install ansible-lint` too, if you want the same
   lint check CI runs.
+- **The external collection dependencies** these roles actually call at
+  runtime: `ansible-galaxy collection install -r ansible/requirements.yml`.
+  Don't separately install this repo's own roles as a collection
+  (`myllynen.rhel_ansible_roles`) on a machine you'll also use to run
+  these playbooks from the checkout — see `docs/ARCHITECTURE.md`'s
+  "Collections vs. local roles" for why that combination silently makes
+  `ansible-playbook` ignore local role edits.
 - **SSH access** (and sudo/`become` credentials) to whatever hosts you want
   to actually audit/remediate, reachable from wherever you run `claude`.
 
