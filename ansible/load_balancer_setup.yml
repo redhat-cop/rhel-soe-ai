@@ -43,12 +43,17 @@
       - keepalived
 
   roles:
-    - packages_install
-    - files_copy
-    - sebooleans
-    - service_state
+    - role: packages_install
+      tags: ["packages_install"]
+    - role: files_copy
+      tags: ["files_copy"]
+    - role: sebooleans
+      tags: ["sebooleans"]
+    - role: service_state
+      tags: ["service_state"]
     # Reload/restart services only if necessary
     - role: service_state
+      tags: ["service_state"]
       vars:
         service_state_restart:
           - name: haproxy

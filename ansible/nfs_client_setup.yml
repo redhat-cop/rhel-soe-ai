@@ -27,7 +27,11 @@
         state: mounted
 
   roles:
-    - packages_install
-    - files_create
-    - service_state
-    - mount_setup
+    - role: packages_install
+      tags: ["packages_install"]
+    - role: files_create
+      tags: ["files_create"]
+    - role: service_state
+      tags: ["service_state"]
+    - role: mount_setup
+      tags: ["mount_setup"]

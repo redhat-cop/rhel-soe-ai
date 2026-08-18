@@ -25,12 +25,23 @@ what `--check --diff` reports from the underlying modules, nothing more.
 
 ## What to do
 
-> **This role is currently commented out** in `ansible/configure_rhel.yml`'s `roles:` list (`#- system_coredump`) and its associated
-> `vars:` block is left at placeholder/empty values. `--tags system_coredump` will report
-> "did not match any tags" until a human operator uncomments the role (and
-> fills in the vars it needs) in `ansible/configure_rhel.yml` — this is a
-> deliberate, host-baseline-scoped opt-in, not a bug. Flag this to the user
-> before assuming the commands below will do anything.
+> **This role is off by default** in `ansible/configure_rhel.yml` — every
+> role there (active or not) is gated by a single `configure_rhel_domains`
+> list variable (`when: "'<name>' in configure_rhel_domains"`), and `system_coredump`
+> isn't in the default value of that list. Nothing needs editing in the
+> playbook itself to turn it on: pass the *full* desired domain list via
+> `-e`, e.g.
+> `-e '{"configure_rhel_domains": [...the default 20..., "system_coredump"]}'`
+> (see `.claude/skills/configure_rhel/SKILL.md` for the current default list
+> to extend, and why it has to be the full list, not just the addition —
+> `-e` replaces the variable's value, it doesn't merge into it). `--tags system_coredump`
+> alone is **not** enough — the domains list and `--tags`/`--skip-tags` are
+> separate, ANDed gates, both verified independently: a role only runs if
+> it's in `configure_rhel_domains` *and* matches the requested tags. Some
+> roles (this one — check its `defaults/main.yml` and task file) also have
+> their own internal enable flag or required variable on top of that, which
+> still needs setting the same as before. Flag all of this to the user before
+> assuming the commands below will do anything.
 
 **Audit** (read-only, safe to run any time):
 
@@ -58,10 +69,11 @@ body. Then stop — a human reviews and merges; see `docs/ARCHITECTURE.md`'s
 
 ## Wiring into the SOE
 
-This role has a row in `.claude/skills/soe/SKILL.md`'s domain table, but is
-**commented out** in `ansible/configure_rhel.yml`'s `roles:` list by default
-(`#- system_coredump`) — see the caveat at the top of "What to do" above. It is not
-referenced by any of the other playbooks (`load_balancer_setup.yml`,
-`nfs_client_setup.yml`, `nfs_server_setup.yml`, `update_rhel.yml`,
-`connect_linux.yml`) either. This repo no longer uses `ansible/site.yml`; see
-`docs/ARCHITECTURE.md`.
+This role has a row in `.claude/skills/soe/SKILL.md`'s domain table. It's
+present (not commented out) in `ansible/configure_rhel.yml`'s `roles:` list,
+gated by `configure_rhel_domains` — off by default, on via `-e` — see the
+caveat at the top of "What to do" above and
+`.claude/skills/configure_rhel/SKILL.md`. It is not referenced by any of the
+other playbooks (`load_balancer_setup.yml`, `nfs_client_setup.yml`,
+`nfs_server_setup.yml`, `update_rhel.yml`, `connect_linux.yml`) either. This
+repo no longer uses `ansible/site.yml`; see `docs/ARCHITECTURE.md`.

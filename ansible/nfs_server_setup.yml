@@ -38,14 +38,21 @@
       - nfs-server
 
   roles:
-    - packages_install
-    - files_create
-    - files_copy
-    - sebooleans
-    - firewall
-    - service_state
+    - role: packages_install
+      tags: ["packages_install"]
+    - role: files_create
+      tags: ["files_create"]
+    - role: files_copy
+      tags: ["files_copy"]
+    - role: sebooleans
+      tags: ["sebooleans"]
+    - role: firewall
+      tags: ["firewall"]
+    - role: service_state
+      tags: ["service_state"]
     # Reload service only if necessary
     - role: service_state
+      tags: ["service_state"]
       vars:
         service_state_restart:
           - name: nfs-server

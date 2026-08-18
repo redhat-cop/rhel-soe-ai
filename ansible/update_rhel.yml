@@ -24,5 +24,7 @@
     system_update_report_pre_display_updates: true
 
   roles:
-    - system_update_report_pre
-    #- system_update
+    - role: system_update_report_pre
+      tags: ["system_update_report_pre"]
+    #- role: system_update
+    #  tags: ["system_update"]

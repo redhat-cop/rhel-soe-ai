@@ -25,10 +25,29 @@ jobs:
       - name: Install Ansible and ansible-lint
         run: pip install --disable-pip-version-check ansible-core ansible-lint
 
-      - name: Syntax check
+      - name: Install external collection dependencies
         working-directory: ansible
-        run: ansible-playbook site.yml --syntax-check
+        run: ansible-galaxy collection install -r requirements.yml
+        # Deliberately does NOT install this repo's own roles as a
+        # collection (myllynen.rhel_ansible_roles) — see requirements.yml
+        # and docs/ARCHITECTURE.md's "Collections vs. local roles". Doing
+        # so here would validate the previously-installed collection
+        # instead of the checkout's actual roles/, defeating the point of
+        # CI.
 
-      - name: Lint roles and playbook
+      - name: Syntax check all playbooks
         working-directory: ansible
-        run: ansible-lint roles/ site.yml
+        run: |
+          for playbook in configure_rhel.yml connect_linux.yml load_balancer_setup.yml nfs_client_setup.yml nfs_server_setup.yml update_rhel.yml; do
+            echo "::group::syntax-check $playbook"
+            ansible-playbook "$playbook" --syntax-check
+            echo "::endgroup::"
+          done
+        # This repo has no single top-level playbook (no site.yml) — roles
+        # are spread across these six purpose-scoped playbooks instead.
+        # See docs/ARCHITECTURE.md's "Playbook layout".
+
+      - name: Lint roles and playbooks
+        working-directory: ansible
+        run: ansible-lint roles/ configure_rhel.yml connect_linux.yml load_balancer_setup.yml nfs_client_setup.yml nfs_server_setup.yml update_rhel.yml
+

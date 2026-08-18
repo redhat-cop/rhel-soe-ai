@@ -68,8 +68,9 @@ body. Then stop — a human reviews and merges; see `docs/ARCHITECTURE.md`'s
 
 ## Wiring into the SOE
 
-This role is included (active, uncommented) in `ansible/configure_rhel.yml`'s
-`roles:` list for the general host baseline, and has a row in
+This role is in `configure_rhel_domains`'s default value in
+`ansible/configure_rhel.yml` (see `.claude/skills/configure_rhel/SKILL.md`)
+for the general host baseline, and has a row in
 `.claude/skills/soe/SKILL.md`'s domain table, so it runs as part of both
 `ansible-playbook ansible/configure_rhel.yml --tags service_state ...` and a full,
 untagged `ansible-playbook ansible/configure_rhel.yml` run. This repo no longer

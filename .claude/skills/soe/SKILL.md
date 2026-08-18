@@ -19,12 +19,22 @@ multi-playbook split.
 
 | Playbook | Purpose | Roles it triggers |
 |---|---|---|
-| `configure_rhel.yml` | **General host baseline** — the closest equivalent to the old `site.yml`, but vars-and-roles-in-one-file rather than tags-driven defaults spread across role `defaults/`. Most domains are configured here. | 20 active by default; 21 more present but commented out (opt-in) |
+| `configure_rhel.yml` | **General host baseline** — the closest equivalent to the old `site.yml`. All 43 in-repo domains it can run are gated by a single `configure_rhel_domains` list variable (`when: "'<name>' in configure_rhel_domains"`) rather than being commented in/out of the file — see `.claude/skills/configure_rhel/SKILL.md`. | 20 in `configure_rhel_domains` by default; 23 more present, fully wired, off by default (enable via `-e`, no file edit needed) |
 | `connect_linux.yml` | **Pre-flight connectivity/access check** — no roles at all, just ad hoc tasks confirming SSH reachability and that `become` actually gets root. Run this first against a new/unfamiliar host before anything else. See `.claude/skills/connect_linux/SKILL.md`. | none (raw tasks only) |
 | `load_balancer_setup.yml` | Configures a host as an haproxy + keepalived load balancer. See `.claude/skills/load_balancer_setup/SKILL.md` — note that skill documents a verified gap: the templates it needs don't currently exist in this repo. | `packages_install`, `files_copy`, `sebooleans`, `service_state` (haproxy/keepalived-specific vars) |
 | `nfs_client_setup.yml` | Configures a host as an NFS client (mounts one export). See `.claude/skills/nfs_client_setup/SKILL.md`. | `packages_install`, `files_create`, `service_state`, `mount_setup` |
 | `nfs_server_setup.yml` | Configures a host as an NFS server (exports one directory). See `.claude/skills/nfs_server_setup/SKILL.md`. | `packages_install`, `files_create`, `files_copy`, `sebooleans`, `firewall`, `service_state` |
 | `update_rhel.yml` | Reports pending dnf updates (and, opt-in, applies them). See `.claude/skills/update_rhel/SKILL.md`. | `system_update_report_pre` active; `system_update` commented out |
+
+**`--tags <domain>` works correctly against all six playbooks** — every
+role entry in all five role-bearing playbooks now carries an explicit
+`tags: ["<name>"]`. This wasn't always true: bare role names in a
+`roles:` list get no implicit tag matching their own name, so
+`--tags <domain>` previously matched nothing anywhere in this repo,
+silently, regardless of what any `SKILL.md` claimed — verified directly,
+fixed as part of adding `configure_rhel_domains` (see
+`.claude/skills/configure_rhel/SKILL.md`'s "Notes"). Trust `--tags` now;
+don't add defensive caveats about it not working, that's fixed.
 
 `ansible/site.yml` is **no longer this repo's entrypoint** — don't suggest
 it, don't run it, and treat any lingering mention of it elsewhere as stale
@@ -41,9 +51,23 @@ playbooks above with *different, playbook-specific variables* — e.g.
 the host's role before running one of these — see each such role's own
 `SKILL.md` ("Wiring into the SOE" section) for specifics.
 
+**Before proposing or validating any role edit**, check whether
+`myllynen.rhel_ansible_roles` is installed as a collection on the machine
+you're running `ansible-playbook` from. It's fine if it is — none of the
+six playbooks above declare a play-level `collections:` keyword for it
+(deliberately; see `docs/ARCHITECTURE.md`'s "Collections vs. local roles"),
+so they always resolve roles from this checkout's own `ansible/roles/`
+regardless. But if you're ever handed a *different* playbook, or a
+modified copy of one of these six that reintroduces that `collections:`
+line, treat that as a reason to stop and confirm which role copy is
+actually running before trusting any `--check --diff` output — a role
+edit can otherwise validate cleanly while silently exercising old,
+previously-installed code.
+
 ## Domain roles — general baseline (`ansible/configure_rhel.yml`)
 
-Active by default (uncommented in the `roles:` list):
+In `configure_rhel_domains` by default (see
+`.claude/skills/configure_rhel/SKILL.md` for the mechanism):
 
 | Skill / role | Domain |
 |---|---|
@@ -68,8 +92,9 @@ Active by default (uncommented in the `roles:` list):
 | `timesync` | Thin wrapper around the external `redhat.rhel_system_roles.timesync` collection role |
 | `watchdog` | systemd hardware/software watchdog timeouts |
 
-Present but **commented out** (opt-in — uncomment in `configure_rhel.yml`
-and fill in the associated `vars:` before `--tags <domain>` does anything):
+Present in the `roles:` list, fully wired, but **off by default** — not
+in `configure_rhel_domains`'s default value. Enable via `-e` for a given
+run (see `.claude/skills/configure_rhel/SKILL.md`); no file edit needed:
 
 | Skill / role | Domain |
 |---|---|
@@ -80,6 +105,7 @@ and fill in the associated `vars:` before `--tags <domain>` does anything):
 | `domain_ad` | AD domain join/leave via realmd/adcli + sssd/authselect |
 | `ima_evm_setup` | IMA/EVM file-integrity appraisal — RHEL 9.7+ only |
 | `motd_issue` | `/etc/motd(.d)` and `/etc/issue.d`/`/etc/issue.net` banners |
+| `mount_setup` | Mounts a configured filesystem — off here by default; the same role is active by default in `nfs_client_setup.yml` instead, see that skill |
 | `multipath_setup` | device-mapper-multipath config — **reboots by default** when enabled |
 | `packages_verify` | rpm-level package verification (missing/modified files) |
 | `repository_setup` | yum.repos.d files + RHSM registration/repo enablement |
@@ -90,19 +116,21 @@ and fill in the associated `vars:` before `--tags <domain>` does anything):
 | `system_coredump` | systemd-coredump enable + size cap |
 | `system_hostname` | `/etc/hostname` |
 | `system_keyboard` | Virtual console keymap + font |
+| `system_update_report_pre` | Reports pending dnf updates — off here by default; active by default in `update_rhel.yml` instead, see that skill |
+| `system_update` | Applies dnf updates — off by default in both `configure_rhel.yml` and `update_rhel.yml`, see that skill |
 | `timezone` | System timezone via `community.general.timezone` |
 | `troubleshooting_tools` | Baseline troubleshooting package set + optional PCP metrics |
-| `usbguard_setup` | USBGuard device authorization — **enables enforcement (`policy: reject`) the moment it's uncommented, no separate opt-in flag** |
+| `usbguard_setup` | USBGuard device authorization — **enables enforcement (`policy: reject`) the moment it actually runs**, not a separate opt-in flag on top of `configure_rhel_domains` |
 
 ## Domain roles — composite playbooks
 
 | Skill / role | Playbook | Purpose in that playbook |
 |---|---|---|
-| `mount_setup` | `nfs_client_setup.yml` | Mounts the configured NFS export (commented out, no-op, in `configure_rhel.yml`) |
+| `mount_setup` | `nfs_client_setup.yml` | Mounts the configured NFS export. Also present (off by default) in `configure_rhel.yml`'s `configure_rhel_domains` toggle — see `.claude/skills/configure_rhel/SKILL.md`. |
 | `files_create` | `nfs_client_setup.yml`, `nfs_server_setup.yml` | Creates the mount point / export directory (not in `configure_rhel.yml` at all) |
 | `files_copy` | `load_balancer_setup.yml`, `nfs_server_setup.yml` | Deploys haproxy/keepalived config, or the `/etc/exports.d` file (not in `configure_rhel.yml` at all) |
-| `system_update_report_pre` | `update_rhel.yml` | Lists pending updates without applying them (not in `configure_rhel.yml` at all) |
-| `system_update` | `update_rhel.yml` | Applies updates — **commented out by default** in both `update_rhel.yml` and `configure_rhel.yml` |
+| `system_update_report_pre` | `update_rhel.yml` | Lists pending updates without applying them. Also present (off by default) in `configure_rhel.yml`'s `configure_rhel_domains` toggle. |
+| `system_update` | `update_rhel.yml` | Applies updates — off by default in both `update_rhel.yml`'s `roles:` list (still a commented line there, not part of the `configure_rhel_domains`-style toggle) and `configure_rhel.yml`'s `configure_rhel_domains` default. |
 
 ## Domain roles — not wired into any playbook
 
@@ -153,9 +181,10 @@ ansible-playbook ansible/configure_rhel.yml --check --diff
 Summarize per-role: which roles reported no diff (compliant vs. current
 variable settings — note several roles do nothing at all until their
 variables are set), which showed diffs (drift found, not yet applied), and
-which failed a task outright. Remember this only covers the roles active
-in `configure_rhel.yml` today (see the table above) — commented-out roles
-report nothing at all, which is different from "compliant."
+which failed a task outright. Remember this only covers the roles in
+`configure_rhel_domains` today (see the table above and
+`.claude/skills/configure_rhel/SKILL.md`) — roles outside that list are
+skipped and report nothing at all, which is different from "compliant."
 
 **To audit one domain**: add `--tags <domain>` to whichever playbook
 actually contains that role — e.g.
@@ -163,7 +192,9 @@ actually contains that role — e.g.
 or `ansible-playbook ansible/nfs_client_setup.yml --tags mount_setup --check --diff`
 for an NFS client. Check the tables above (or the domain's own `SKILL.md`)
 before picking a playbook — running the wrong one either matches no tags
-or applies the wrong variables.
+or applies the wrong variables. Against `configure_rhel.yml` specifically,
+`--tags` alone isn't enough if the domain isn't in `configure_rhel_domains`
+— see `.claude/skills/configure_rhel/SKILL.md`.
 
 **To set up a load balancer or NFS host**: use the matching composite
 playbook directly rather than trying to reconstruct its role list against
@@ -191,10 +222,10 @@ touches auth, boot config, and device policy in one pass (high blast
 radius), and several of these roles can act immediately and disruptively
 on their own:
 
-- `usbguard_setup` enables and starts enforcement **the moment it's
-  uncommented** in `configure_rhel.yml` (`policy: reject`, no separate
-  opt-in flag) — see that skill's `SKILL.md` before remediating any host
-  with only physical console access.
+- `usbguard_setup` enables and starts enforcement **the moment it
+  actually runs** (`policy: reject`, no separate opt-in flag on top of
+  being in `configure_rhel_domains`) — see that skill's `SKILL.md` before
+  remediating any host with only physical console access.
 - `boot_parameters` and `system_locale` both **reboot the host by
   default** (`boot_parameters_reboot` / `system_locale_reboot`) when they
   change something — get explicit confirmation before a real remediate
@@ -209,12 +240,15 @@ on their own:
   locked.
 - `ipv6_setup` **reboots on change with no opt-out flag**.
 - `multipath_setup` reboots by default (`multipath_setup_reboot: true`)
-  once uncommented, rather than reloading `multipathd` in place.
+  once it's actually included in `configure_rhel_domains` and applies a
+  change, rather than reloading `multipathd` in place.
 - `scap_compliance` remediates (not just audits) whenever
   `scap_compliance_remediate: true` is set, **regardless of whether
-  `--check` is passed**, once uncommented.
-- `system_update`, once uncommented in `update_rhel.yml`, can update dozens
-  of packages and reboot the host per `system_update_reboot_policy`.
+  `--check` is passed**, once it's in `configure_rhel_domains`.
+- `system_update`, once uncommented in `update_rhel.yml` (a literal
+  commented-out line there, not part of the `configure_rhel_domains`-style
+  toggle — see that skill), can update dozens of packages and reboot the
+  host per `system_update_reboot_policy`.
 
 Prefer remediating one domain at a time
 (`ansible-playbook ansible/<playbook>.yml --tags <domain>`) with the user's

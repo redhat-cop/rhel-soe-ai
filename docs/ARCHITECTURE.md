@@ -34,7 +34,7 @@ domain. Instead:
 
 | Playbook | Scope |
 |---|---|
-| `configure_rhel.yml` | General host baseline — most domain roles live here, driven by a `vars:` block in the same file rather than each role's own `defaults/`. Many roles are present but commented out (opt-in). |
+| `configure_rhel.yml` | General host baseline — most domain roles live here, driven by a `vars:` block in the same file rather than each role's own `defaults/`. All 43 in-repo roles it can run are gated by a single `configure_rhel_domains` list variable rather than being commented in/out of the file — see `.claude/skills/configure_rhel/SKILL.md`. |
 | `connect_linux.yml` | Pre-flight connectivity/access check — no roles, just ad hoc tasks confirming SSH reachability and `become`. |
 | `load_balancer_setup.yml` | Configures a host as an haproxy + keepalived load balancer, reusing generic roles (`packages_install`, `files_copy`, `sebooleans`, `service_state`) with load-balancer-specific variables. |
 | `nfs_client_setup.yml` | Configures a host as an NFS client, reusing `packages_install`, `files_create`, `service_state`, `mount_setup`. |
@@ -51,8 +51,16 @@ deliberate reuse pattern (why re-implement "install a package list" or
 mean "is `packages_install` compliant?" is a question that only makes
 sense against one specific playbook at a time, not the role in the
 abstract. See `.claude/skills/soe/SKILL.md` for the full role-to-playbook
-mapping, including which roles are opt-in (commented out by default) and
-which aren't wired into any playbook at all yet.
+mapping, including which roles are off by default within
+`configure_rhel.yml` and which aren't wired into any playbook at all yet.
+
+Every role entry in all five role-bearing playbooks also carries an
+explicit `tags: ["<name>"]`, so `--tags <domain>` reliably selects just
+that role. This needed fixing directly: a bare role name in a `roles:`
+list gets no implicit tag matching its own name, so `--tags <domain>`
+previously matched nothing anywhere in this repo regardless of what any
+`SKILL.md` claimed — confirmed by testing against the actual, unmodified
+`main` branch, not assumed from reading the YAML.
 
 ## Collections vs. local roles
 
@@ -195,14 +203,17 @@ a failed task with the `fail_msg` explaining what's wrong, both under
   or rebooting — see each role's `SKILL.md` for the specific judgment
   calls left to a human (e.g. `accounts_policy` reports `NOPASSWD:ALL`
   sudoers entries but doesn't remove them).
-- High-blast-radius changes are opt-in via a role variable, not on by
-  default: `usbguard_setup` installs USBGuard and prepares its policy but
-  only enables the service when `soe_usbguard_manage_service: true` is set
-  explicitly, because a default-block USB policy without a reviewed HID
-  allow rule can lock out a physically-connected keyboard/mouse. (In
-  `configure_rhel.yml`, `usbguard_setup` is additionally commented out of
-  the `roles:` list entirely — a second layer of opt-in on top of the
-  role's own variable.)
+- High-blast-radius changes get an extra layer of friction beyond a role
+  variable, not just a variable default: `usbguard_setup` defaults to
+  `usbguard_setup_policy: reject` — enforcement, not merely installed —
+  the moment the role actually runs, with no separate "enable the
+  service" flag to opt into first. Because of that, the real safety net
+  here is `configure_rhel_domains` (see
+  `.claude/skills/configure_rhel/SKILL.md`): `usbguard_setup` is off by
+  default in `configure_rhel.yml`, so it takes a deliberate `-e` on a
+  specific run, or a deliberate change to the default list via the
+  branch + PR workflow, before enforcement can start — not a role
+  variable a host's group_vars might set without anyone noticing.
 - `boot_parameters` is audit-only by design — GRUB command-line edits only
   take effect on next boot and a bad one can leave a host unbootable, so
   this role asserts required/forbidden kernel parameters but leaves the
@@ -210,17 +221,17 @@ a failed task with the `fail_msg` explaining what's wrong, both under
 - Config edits that could break remote access are validated before being
   applied: `motd_issue`'s sshd `Banner` edit runs `sshd -t -f %s` via
   `lineinfile`'s `validate` option before touching `sshd_config`.
-- **Commenting a role out of a playbook's `roles:` list is itself a safety
-  convention now**, not just an unused-code smell: `configure_rhel.yml`
-  keeps 21 roles present-but-commented specifically so a plain, untagged
-  run of the baseline playbook doesn't silently pick up something
-  high-blast-radius (account deletion, USB lockdown, AD domain join) that
-  a host's group_vars haven't been reviewed for yet. Don't "clean up" by
-  uncommenting a role across the board — uncomment one role for one host
-  or group, deliberately, per the branch + PR workflow below. One
-  exception worth flagging: `system_init` is *not* on this commented list
-  in `configure_rhel.yml` even though it reboots the host by default —
-  see that role's `SKILL.md`.
+- **A role being off by default in `configure_rhel_domains` is itself a
+  safety convention**, not just an unused-feature marker:
+  `configure_rhel.yml` keeps 23 roles present-but-off specifically so a
+  plain, untagged run of the baseline playbook doesn't silently pick up
+  something high-blast-radius (account deletion, USB lockdown, AD domain
+  join) that a host's group_vars haven't been reviewed for yet. Don't
+  "clean up" by adding every available domain to the default list at
+  once — add one domain for one host or group, deliberately, per the
+  branch + PR workflow below. One exception worth flagging: `system_init`
+  *is* in the default list in `configure_rhel.yml` even though it reboots
+  the host by default — see that role's `SKILL.md`.
 
 ## Contribution workflow: branch + PR
 
@@ -276,9 +287,13 @@ a live host — needs an explicit human decision.
    feeds an `assert`, and `create: true` to any `lineinfile` targeting a
    config file that might not pre-exist on a minimal install.
 4. Decide where the role belongs and wire it in accordingly:
-   - General host baseline → add it (active, or commented out if it's
-     high-blast-radius/opt-in) to `ansible/configure_rhel.yml`'s `roles:`
-     list, with a matching `vars:` entry.
+   - General host baseline → add a `- role: <name> / tags: ["<name>"] /
+     when: "'<name>' in configure_rhel_domains"` entry to
+     `ansible/configure_rhel.yml`'s `roles:` list, with a matching
+     `vars:` entry, and decide whether it belongs in the default
+     `configure_rhel_domains` value (active by default) or not
+     (high-blast-radius/opt-in) — see
+     `.claude/skills/configure_rhel/SKILL.md`.
    - A specific host purpose (load balancer, NFS client/server, update
      run) → add it to the matching existing playbook, or propose a new
      purpose-scoped playbook following the same shape (a `vars:` block

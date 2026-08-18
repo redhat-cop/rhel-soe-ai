@@ -28,12 +28,23 @@ plus several commented-out optional entries (`ltrace`, `numactl`, `perf`,
 
 ## What to do
 
-> **This role is currently commented out** in `ansible/configure_rhel.yml`'s `roles:` list (`#- troubleshooting_tools`) and its associated
-> `vars:` block is left at placeholder/empty values. `--tags troubleshooting_tools` will report
-> "did not match any tags" until a human operator uncomments the role (and
-> fills in the vars it needs) in `ansible/configure_rhel.yml` — this is a
-> deliberate, host-baseline-scoped opt-in, not a bug. Flag this to the user
-> before assuming the commands below will do anything.
+> **This role is off by default** in `ansible/configure_rhel.yml` — every
+> role there (active or not) is gated by a single `configure_rhel_domains`
+> list variable (`when: "'<name>' in configure_rhel_domains"`), and `troubleshooting_tools`
+> isn't in the default value of that list. Nothing needs editing in the
+> playbook itself to turn it on: pass the *full* desired domain list via
+> `-e`, e.g.
+> `-e '{"configure_rhel_domains": [...the default 20..., "troubleshooting_tools"]}'`
+> (see `.claude/skills/configure_rhel/SKILL.md` for the current default list
+> to extend, and why it has to be the full list, not just the addition —
+> `-e` replaces the variable's value, it doesn't merge into it). `--tags troubleshooting_tools`
+> alone is **not** enough — the domains list and `--tags`/`--skip-tags` are
+> separate, ANDed gates, both verified independently: a role only runs if
+> it's in `configure_rhel_domains` *and* matches the requested tags. Some
+> roles (this one — check its `defaults/main.yml` and task file) also have
+> their own internal enable flag or required variable on top of that, which
+> still needs setting the same as before. Flag all of this to the user before
+> assuming the commands below will do anything.
 
 **Audit**: `ansible-playbook ansible/configure_rhel.yml --tags troubleshooting_tools --check --diff`.
 Read the `dnf` task's own `--diff` output for which packages are

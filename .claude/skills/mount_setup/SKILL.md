@@ -42,12 +42,14 @@ ansible-playbook ansible/nfs_client_setup.yml --tags mount_setup                
 Summarize the diff output and any failed tasks in plain language, and only
 drop `--check` after the user explicitly asks.
 
-**Any other host** — the role is present but **commented out** in
-`ansible/configure_rhel.yml`'s `roles:` list (`#- mount_setup`); it's a
-no-op there today. Uncomment it and set `mount_setup_enable`/
-`mount_setup_disable` for that host/group before
-`ansible-playbook ansible/configure_rhel.yml --tags mount_setup` will do
-anything.
+**Any other host** — the role is present in
+`ansible/configure_rhel.yml`'s `roles:` list, gated by
+`configure_rhel_domains` (off by default — see
+`.claude/skills/configure_rhel/SKILL.md`); it's a no-op there today. Add
+`mount_setup` to `configure_rhel_domains` via `-e` (no file edit needed)
+and set `mount_setup_enable`/`mount_setup_disable` for that host/group
+before `ansible-playbook ansible/configure_rhel.yml --tags mount_setup`
+will do anything.
 
 **Propose a change to the role itself**: never edit and commit directly. On a
 branch named `soe/mount_setup/<short-desc>`, edit `ansible/roles/mount_setup/`, validate
@@ -60,8 +62,10 @@ body. Then stop — a human reviews and merges; see `docs/ARCHITECTURE.md`'s
 ## Wiring into the SOE
 
 This role has a row in `.claude/skills/soe/SKILL.md`'s domain table. It's
-active by default only via `ansible/nfs_client_setup.yml`; it's present but
-**commented out** in `ansible/configure_rhel.yml`'s `roles:` list, so a
-plain, untagged `ansible-playbook ansible/configure_rhel.yml` run does not
-touch mounts on a general-purpose host. This repo no longer uses
-`ansible/site.yml`; see `docs/ARCHITECTURE.md`.
+active by default only via `ansible/nfs_client_setup.yml`; it's present in
+`ansible/configure_rhel.yml`'s `roles:` list but off by default there
+(not in `configure_rhel_domains`'s default value — see
+`.claude/skills/configure_rhel/SKILL.md`), so a plain, untagged
+`ansible-playbook ansible/configure_rhel.yml` run does not touch mounts on
+a general-purpose host. This repo no longer uses `ansible/site.yml`; see
+`docs/ARCHITECTURE.md`.

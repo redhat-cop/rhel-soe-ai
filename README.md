@@ -29,6 +29,7 @@ ansible/
       meta/main.yml           # role metadata
 .claude/skills/
   soe/SKILL.md                # orchestrator: which playbook to use for what
+  configure_rhel/SKILL.md      # choose which configure_rhel.yml domains apply
   connect_linux/SKILL.md       # pre-flight connectivity/access check
   load_balancer_setup/SKILL.md  # haproxy + keepalived load balancer
   nfs_client_setup/SKILL.md      # NFS client
@@ -43,15 +44,15 @@ docs/
 
 All 54 domain roles under `ansible/roles/` are fully implemented — real,
 idempotent Ansible tasks, not stubs. See `.claude/skills/soe/SKILL.md` for
-the full role-to-playbook mapping (which roles are active by default in
-`configure_rhel.yml`, which are present but commented out, which only run
+the full role-to-playbook mapping (which roles are on by default in
+`configure_rhel.yml`, which are off by default there, which only run
 via a composite playbook, and which aren't wired into any playbook yet).
 
 ## Playbook layout
 
 | Playbook | Scope |
 |---|---|
-| `configure_rhel.yml` | **General host baseline.** Most domain roles are configured here, driven by a `vars:` block in the same file. 20 roles are active by default; 21 more are present but commented out (opt-in — uncomment and fill in vars before use). |
+| `configure_rhel.yml` | **General host baseline.** Most domain roles are configured here, driven by a `vars:` block in the same file. All 43 in-repo roles it can run are gated by one `configure_rhel_domains` list variable — 20 on by default, 23 more available and fully wired, just off by default. Enable any of them for a run with `-e`, no file edit needed — see `.claude/skills/configure_rhel/SKILL.md`. |
 | `connect_linux.yml` | **Pre-flight check.** Confirms SSH reachability and that `become` actually reaches root, before anything else runs. No roles — just ad hoc tasks. Run this first against any host you haven't touched before. |
 | `load_balancer_setup.yml` | Configures a host as an haproxy + keepalived load balancer. |
 | `nfs_client_setup.yml` | Configures a host as an NFS client (mounts one export). |

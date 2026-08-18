@@ -69,17 +69,19 @@ body. Then stop — a human reviews and merges; see `docs/ARCHITECTURE.md`'s
 
 ## Wiring into the SOE
 
-This role is **included and active** in `ansible/configure_rhel.yml`'s
-`roles:` list (uncommented, at the very end) — this is the opposite of its
-old status under `ansible/site.yml`, where it was deliberately excluded
-from the default `roles:` list (see the "excluded from the default run"
-table this repo used to keep in `.claude/skills/soe/SKILL.md`) because it
-acts unconditionally with no guard variable and reboots the host. That
-exclusion doesn't apply to `configure_rhel.yml`: a plain, untagged
+This role is in `configure_rhel_domains`'s **default** value in
+`ansible/configure_rhel.yml` (see `.claude/skills/configure_rhel/SKILL.md`)
+— this is the opposite of its old status under `ansible/site.yml`, where
+it was deliberately excluded from the default `roles:` list (see the
+"excluded from the default run" table this repo used to keep in
+`.claude/skills/soe/SKILL.md`) because it acts unconditionally with no
+guard variable and reboots the host. That exclusion doesn't apply to
+`configure_rhel.yml`: a plain, untagged
 `ansible-playbook ansible/configure_rhel.yml` run now **does** reboot the
 host via this role. If a host needs `configure_rhel.yml`'s baseline
 without the reboot, either run with `--tags` excluding `system_init`
-(`--skip-tags system_init`), or override `system_init_final_actions` to
+(`--skip-tags system_init`), pass a `configure_rhel_domains` list that
+leaves `system_init` out, or override `system_init_final_actions` to
 drop `reboot` for that host/group. Don't assume this role is a safe no-op
 the way it was when `site.yml` was the entrypoint. This repo no longer
 uses `ansible/site.yml`; see `docs/ARCHITECTURE.md`.

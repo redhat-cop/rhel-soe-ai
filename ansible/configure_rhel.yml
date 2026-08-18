@@ -5,6 +5,51 @@
   gather_facts: false
   vars:
     #
+    # configure_rhel_domains -- which in-repo roles this playbook applies.
+    #
+    # Every role below is now gated by `when: "'<name>' in
+    # configure_rhel_domains"` instead of being commented in/out of the
+    # roles: list. Override this list with -e/--extra-vars (or a
+    # group_vars/host_vars file) to change what a given run applies,
+    # without editing this playbook. The default below reproduces exactly
+    # what this playbook applied before this variable existed -- 20 roles,
+    # active by default. See .claude/skills/configure_rhel/SKILL.md for
+    # the full catalog of what else is available to add, and
+    # docs/ARCHITECTURE.md for how this interacts with --tags/--skip-tags.
+    #
+    # NOT covered by this variable (deliberately, always commented out
+    # below regardless of this list's contents):
+    #   - the redhat.rhel_system_roles.* / community.general.* entries
+    #     interleaved below -- external collection roles, not part of
+    #     this repo's own ansible/roles/, needing their own collection
+    #     installed and their own vars reviewed before ever enabling
+    #   - ipaclient -- referenced in a stale comment below but not an
+    #     actual role in this repo (no ansible/roles/ipaclient/); left
+    #     commented, not wired into the toggle, flagged here rather than
+    #     silently removed
+    configure_rhel_domains:
+      - ipv6_setup
+      - etc_hosts
+      - guest_agent
+      - resolver_configuration
+      - timesync
+      - packages_remove
+      - boot_parameters
+      - system_locale
+      - audit_setup
+      - certificates
+      - firewall
+      - watchdog
+      - packages_install
+      - performance_tuning
+      - root_password
+      - security_hardening
+      - sebooleans
+      - service_state
+      - sshd_configuration
+      - system_init
+
+    #
     # accounts_local
     #
     # List of local users to delete
@@ -1120,62 +1165,148 @@
     watchdog_device: #/dev/watchdog0
 
   roles:
-    #- system_hostname
-    - ipv6_setup
-    - etc_hosts
-    #- repository_setup
+    - role: system_hostname
+      tags: ["system_hostname"]
+      when: "'system_hostname' in configure_rhel_domains"
+    - role: ipv6_setup
+      tags: ["ipv6_setup"]
+      when: "'ipv6_setup' in configure_rhel_domains"
+    - role: etc_hosts
+      tags: ["etc_hosts"]
+      when: "'etc_hosts' in configure_rhel_domains"
+    - role: repository_setup
+      tags: ["repository_setup"]
+      when: "'repository_setup' in configure_rhel_domains"
     #- redhat.rhel_system_roles.rhc
-    - guest_agent
+    - role: guest_agent
+      tags: ["guest_agent"]
+      when: "'guest_agent' in configure_rhel_domains"
     #- redhat.rhel_system_roles.network
-    #- dns_cache
-    - resolver_configuration
-    #- timezone
-    - timesync
-    - packages_remove
-    - boot_parameters
+    - role: dns_cache
+      tags: ["dns_cache"]
+      when: "'dns_cache' in configure_rhel_domains"
+    - role: resolver_configuration
+      tags: ["resolver_configuration"]
+      when: "'resolver_configuration' in configure_rhel_domains"
+    - role: timezone
+      tags: ["timezone"]
+      when: "'timezone' in configure_rhel_domains"
+    - role: timesync
+      tags: ["timesync"]
+      when: "'timesync' in configure_rhel_domains"
+    - role: packages_remove
+      tags: ["packages_remove"]
+      when: "'packages_remove' in configure_rhel_domains"
+    - role: boot_parameters
+      tags: ["boot_parameters"]
+      when: "'boot_parameters' in configure_rhel_domains"
     #- redhat.rhel_system_roles.bootloader
-    #- system_keyboard
-    - system_locale
-    - audit_setup
-    #- {role: multipath_setup, when: ansible_facts.virtualization_role != 'guest'}
+    - role: system_keyboard
+      tags: ["system_keyboard"]
+      when: "'system_keyboard' in configure_rhel_domains"
+    - role: system_locale
+      tags: ["system_locale"]
+      when: "'system_locale' in configure_rhel_domains"
+    - role: audit_setup
+      tags: ["audit_setup"]
+      when: "'audit_setup' in configure_rhel_domains"
+    - role: multipath_setup
+      tags: ["multipath_setup"]
+      when: "'multipath_setup' in configure_rhel_domains and (ansible_facts.virtualization_role != 'guest')"
     #- redhat.rhel_system_roles.kernel_settings
     #- redhat.rhel_system_roles.storage
     #- redhat.rhel_system_roles.kdump
-    #- system_update_report_pre
-    #- system_update
+    - role: system_update_report_pre
+      tags: ["system_update_report_pre"]
+      when: "'system_update_report_pre' in configure_rhel_domains"
+    - role: system_update
+      tags: ["system_update"]
+      when: "'system_update' in configure_rhel_domains"
     #- redhat.rhel_system_roles.aide
-    #- accounts_policy
-    #- accounts_local
-    - certificates
-    #- {role: domain_ad, when: domain_ad_admin_username is defined}
+    - role: accounts_policy
+      tags: ["accounts_policy"]
+      when: "'accounts_policy' in configure_rhel_domains"
+    - role: accounts_local
+      tags: ["accounts_local"]
+      when: "'accounts_local' in configure_rhel_domains"
+    - role: certificates
+      tags: ["certificates"]
+      when: "'certificates' in configure_rhel_domains"
+    - role: domain_ad
+      tags: ["domain_ad"]
+      when: "'domain_ad' in configure_rhel_domains and (domain_ad_admin_username is defined)"
     #- {role: ipaclient, state: present, when: ipaclient_domain is defined}
-    #- ima_evm_setup
+    - role: ima_evm_setup
+      tags: ["ima_evm_setup"]
+      when: "'ima_evm_setup' in configure_rhel_domains"
     #- redhat.rhel_system_roles.fapolicyd
-    - firewall
+    - role: firewall
+      tags: ["firewall"]
+      when: "'firewall' in configure_rhel_domains"
     #- redhat.rhel_system_roles.firewall
-    - watchdog
-    #- motd_issue
-    #- mount_setup
-    - packages_install
-    - performance_tuning
-    #- rescue_image
-    - root_password
-    - security_hardening
-    - sebooleans
-    #- packages_verify
-    - service_state
-    #- shell_profile
-    - sshd_configuration
+    - role: watchdog
+      tags: ["watchdog"]
+      when: "'watchdog' in configure_rhel_domains"
+    - role: motd_issue
+      tags: ["motd_issue"]
+      when: "'motd_issue' in configure_rhel_domains"
+    - role: mount_setup
+      tags: ["mount_setup"]
+      when: "'mount_setup' in configure_rhel_domains"
+    - role: packages_install
+      tags: ["packages_install"]
+      when: "'packages_install' in configure_rhel_domains"
+    - role: performance_tuning
+      tags: ["performance_tuning"]
+      when: "'performance_tuning' in configure_rhel_domains"
+    - role: rescue_image
+      tags: ["rescue_image"]
+      when: "'rescue_image' in configure_rhel_domains"
+    - role: root_password
+      tags: ["root_password"]
+      when: "'root_password' in configure_rhel_domains"
+    - role: security_hardening
+      tags: ["security_hardening"]
+      when: "'security_hardening' in configure_rhel_domains"
+    - role: sebooleans
+      tags: ["sebooleans"]
+      when: "'sebooleans' in configure_rhel_domains"
+    - role: packages_verify
+      tags: ["packages_verify"]
+      when: "'packages_verify' in configure_rhel_domains"
+    - role: service_state
+      tags: ["service_state"]
+      when: "'service_state' in configure_rhel_domains"
+    - role: shell_profile
+      tags: ["shell_profile"]
+      when: "'shell_profile' in configure_rhel_domains"
+    - role: sshd_configuration
+      tags: ["sshd_configuration"]
+      when: "'sshd_configuration' in configure_rhel_domains"
     #- community.general.ssh_config
     #- redhat.rhel_system_roles.ssh
     #- redhat.rhel_system_roles.sshd
-    #- troubleshooting_tools
-    #- usbguard_setup
+    - role: troubleshooting_tools
+      tags: ["troubleshooting_tools"]
+      when: "'troubleshooting_tools' in configure_rhel_domains"
+    - role: usbguard_setup
+      tags: ["usbguard_setup"]
+      when: "'usbguard_setup' in configure_rhel_domains"
     #- redhat.rhel_system_roles.cockpit
     #- redhat.rhel_system_roles.logging
     #- redhat.rhel_system_roles.metrics
-    #- {role: splunk_forwarder, when: splunk_user_password_hash is defined}
-    #- system_coredump
-    #- scap_compliance
-    #- cron_setup
-    - system_init
+    - role: splunk_forwarder
+      tags: ["splunk_forwarder"]
+      when: "'splunk_forwarder' in configure_rhel_domains and (splunk_user_password_hash is defined)"
+    - role: system_coredump
+      tags: ["system_coredump"]
+      when: "'system_coredump' in configure_rhel_domains"
+    - role: scap_compliance
+      tags: ["scap_compliance"]
+      when: "'scap_compliance' in configure_rhel_domains"
+    - role: cron_setup
+      tags: ["cron_setup"]
+      when: "'cron_setup' in configure_rhel_domains"
+    - role: system_init
+      tags: ["system_init"]
+      when: "'system_init' in configure_rhel_domains"
