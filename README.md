@@ -1,4 +1,4 @@
-# soe-ai
+# rhel-soe-ai
 
 Experimentation with building a Linux Standard Operating Environment (SOE)
 out of specialized AI agents, defined as Claude Code skills. Each skill owns
@@ -9,6 +9,16 @@ script.
 There is **no single top-level playbook** that runs every domain. Roles are
 triggered through six purpose-scoped playbooks instead — see "Playbook
 layout" below.
+
+# Credits: Ansible content
+All the Ansible content is the original work of Marko Myllynen and has been copied from his https://github.com/myllynen/rhel-ansible-roles/ repository.
+Many core features of the RHEL-SOE-AI project would not been possible without it, such as:
+* A fully featured standardization for Red Hat Enterprise Linux
+* All the domain specific skills
+* Mechanisms for applying SoE
+* And much more.
+
+You should go visits Marko's repository, if you are looking for a state of the art SoE.
 
 ## Layout
 
