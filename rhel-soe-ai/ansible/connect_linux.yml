@@ -1,0 +1,53 @@
+---
+- name: Linux connectivity test
+  hosts: all
+  become: false
+  gather_facts: false
+  tasks:
+    - name: Display Ansible runtime essentials
+      vars:
+        output:
+          ansible_version: "{{ ansible_version }}"
+          ansible_config_file: "{{ ansible_config_file }}"
+          ansible_inventory_sources: "{{ ansible_inventory_sources }}"
+          ansible_playbook_python: "{{ ansible_playbook_python }}"
+          ansible_play_hosts_all: "{{ ansible_play_hosts_all }}"
+          ansible_play_batch: "{{ ansible_play_batch }}"
+      ansible.builtin.debug:
+        msg: "{{ output }}"
+      run_once: true
+
+    - name: Set remote connection port
+      vars:
+        conn_port: "{{ 'ansible_' + ansible_connection + '_port' }}"
+      ansible.builtin.set_fact:
+        remo_port: "{{ lookup('vars', conn_port, default='')
+                       | default(ansible_port, true)
+                       | default('22', true) }}"
+
+    - name: Display connection parameters
+      vars:
+        conn_user: "{{ 'ansible_' + ansible_connection + '_user' }}"
+        remo_user: "{{ lookup('vars', conn_user, default='')
+                       | default(ansible_user, true)
+                       | default(lookup('env', 'USER'), true) }}"
+      ansible.builtin.debug:
+        msg: "Attempting to connect as {{ remo_user }} to {{ inventory_hostname }}:{{ remo_port }}"
+
+    - name: Check host reachable
+      ansible.builtin.wait_for:
+        host: "{{ inventory_hostname }}"
+        port: "{{ remo_port }}"
+        search_regex: OpenSSH
+        timeout: 10
+      delegate_to: localhost
+
+    - name: Check host access
+      ansible.builtin.ping:
+
+    - name: Check user privileges
+      become: true
+      ansible.builtin.command: /usr/bin/whoami
+      register: whoami_output
+      failed_when: whoami_output.stdout != 'root'
+      changed_when: false

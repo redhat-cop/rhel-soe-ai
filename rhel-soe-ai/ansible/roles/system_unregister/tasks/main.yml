@@ -1,0 +1,178 @@
+---
+- name: Get RHSM server name
+  check_mode: false
+  # noqa: risky-shell-pipe
+  ansible.builtin.shell: >
+    awk -F '=' '/^hostname/ {print $2}' /etc/rhsm/rhsm.conf 2> /dev/null | xargs
+  register: rhsm_server
+  failed_when: false
+  changed_when: false
+
+- name: Gather package facts
+  ansible.builtin.package_facts:
+
+- name: Disable rhcd service
+  ansible.builtin.service:
+    name: rhcd
+    enabled: false
+  when: "'rhc' in ansible_facts.packages"
+
+- name: Stop rhcd service
+  ansible.builtin.service:
+    name: rhcd
+    state: stopped
+  when: "'rhc' in ansible_facts.packages"
+
+- name: Unregister system from Red Hat Insights
+  ansible.builtin.command:
+    cmd: insights-client --unregister
+    removes: /etc/insights-client/.registered
+  when: "'insights-client' in ansible_facts.packages"
+
+- name: Remove Insights state files
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/insights-client/.last-upload.results
+    - /etc/insights-client/.lastupload
+    - /etc/insights-client/.run_insights_client_next_boot
+    - /etc/rhsm/facts/insights-client.facts
+
+- name: Unregister from Red Hat Subscription Management
+  ansible.builtin.command: subscription-manager unregister
+  register: unregister
+  failed_when: unregister.rc != 0 and 'currently not registered' not in unregister.stderr
+  changed_when: unregister.rc == 0 and 'has been unregistered' in unregister.stdout
+  ignore_errors: true
+
+- name: Remove all Subscription Management local data
+  ansible.builtin.command: subscription-manager clean
+  changed_when: unregister is failed
+
+# https://redhat.atlassian.net/browse/RHEL-176572
+- name: Remove container registry RHSM server certificates
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/containers/certs.d/{{ rhsm_server.stdout }}
+  when: rhsm_server.stdout | length > 0
+
+- name: Remove Katello CA package
+  ansible.builtin.dnf:
+    name: katello-ca-consumer-*
+    state: absent
+    cacheonly: true
+    disable_plugin:
+      - product-id
+      - subscription-manager
+    disablerepo: '*'
+  register: katello_packages
+
+- name: Remove Katello CA certificates
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  register: katello_files
+  loop:
+    - /etc/pki/ca-trust/source/anchors/katello-server-ca.pem
+    - /etc/rhsm/ca/katello-default-ca.pem
+    - /etc/rhsm/ca/katello-server-ca.pem
+
+- name: Update system CA trust store
+  ansible.builtin.command: update-ca-trust
+  changed_when: true
+  when: katello_packages is changed or
+        katello_files is changed
+
+- name: Locate RHSM cache files
+  ansible.builtin.find:
+    paths: /var/lib/rhsm
+    file_type: file
+    recurse: true
+    excludes:
+      - redhat.repo
+      - syspurpose.json
+  register: rhsm_cache
+
+- name: Remove RHSM cache files
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop: "{{ rhsm_cache.files | map(attribute='path') }}"
+
+- name: Clean package manager caches
+  ansible.builtin.command: dnf -C --disableplugin=product-id,subscription-manager clean all
+  register: pkg_cache
+  changed_when: not pkg_cache.stdout.startswith('0 files removed')
+
+- name: Reset RHSM state files
+  ansible.builtin.copy:
+    content: "{{ {} | to_yaml if item.startswith('/etc') else '{}' }}"
+    dest: "{{ item }}"
+    owner: root
+    group: root
+    mode: '0640'
+  loop:
+    - /etc/rhsm/syspurpose/syspurpose.json
+    - /var/lib/rhsm/cache/syspurpose.json
+
+- name: Check RHSM configuration backup files
+  ansible.builtin.find:
+    paths: /etc/rhsm
+    patterns: 'rhsm.conf.*'
+  register: rhsm_backups
+
+- name: Restore RHSM configuration backup files
+  ansible.builtin.copy:
+    src: "{{ item.path }}"
+    dest: /etc/rhsm/rhsm.conf
+    mode: '0644'
+    remote_src: true
+  loop: "{{ rhsm_backups.files | sort(attribute='path') }}"
+  loop_control:
+    label: "{{ item.path }}"
+  when: item.path | basename in ['rhsm.conf.bak', 'rhsm.conf.kat-backup', 'rhsm.conf.rpmnew']
+
+- name: Remove RHSM configuration backup files
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: absent
+  loop: "{{ rhsm_backups.files | sort(attribute='path') }}"
+  loop_control:
+    label: "{{ item.path }}"
+  when: item.path | basename in ['rhsm.conf.bak', 'rhsm.conf.kat-backup', 'rhsm.conf.rpmnew']
+
+- name: Disable yggdrasild service
+  ansible.builtin.service:
+    name: yggdrasild
+    enabled: false
+  when: "'yggdrasil' in ansible_facts.packages"
+
+- name: Stop yggdrasild service
+  ansible.builtin.service:
+    name: yggdrasild
+    state: stopped
+  when: "'yggdrasil' in ansible_facts.packages"
+
+# Backup may contain Satellite URL, reset to RPM default
+- name: Reset yggdrasil configuration file
+  ansible.builtin.copy:
+    content: |
+      # yggdrasil global configuration settings
+
+      broker = ["tcp://test.mosquitto.org:1883"]
+      log-level = "error"
+    dest: /etc/yggdrasil/config.toml
+    owner: root
+    group: root
+    mode: '0644'
+  when: "'yggdrasil' in ansible_facts.packages"
+
+- name: Remove yggdrasil configuration backup file
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/yggdrasil/config.toml.bak

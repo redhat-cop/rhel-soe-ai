@@ -1,0 +1,26 @@
+---
+# Install a set of commonly used troubleshooting tools
+troubleshooting_tools:
+  - bind-utils
+  - curl
+  - ethtool
+  - iotop
+  - iproute
+  - lsof
+  #- ltrace
+  - man-pages
+  #- numactl
+  - pcp-system-tools
+  #- perf
+  - policycoreutils-python-utils
+  - procps-ng
+  - psmisc
+  #- setroubleshoot-server
+  - sos
+  - strace
+  - sysstat
+  - tcpdump
+  - time
+
+# Enable PCP performance metrics as needed
+troubleshooting_tools_enable_perf_metrics: true
