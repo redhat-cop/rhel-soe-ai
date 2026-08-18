@@ -10,6 +10,13 @@ name are `guest_agent`, not `vm_guest_agent`). See `docs/ARCHITECTURE.md`
 for the shared conventions. Unlike most domains, this role branches on
 detected virtualization facts rather than checking one fixed baseline.
 
+`ansible/roles/guest_agent/README.md` documents this role's full
+configuration surface (every `defaults/main.yml` variable, with its
+original inline comments, rendered as a single reference). Read it
+before proposing or explaining how to configure this role — it
+reflects the role's actual current defaults even if a variable summary
+elsewhere in this file has drifted out of sync with the role.
+
 ## What the role actually does
 
 Encoded in `ansible/roles/guest_agent/defaults/main.yml`:

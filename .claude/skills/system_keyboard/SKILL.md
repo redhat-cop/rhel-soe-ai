@@ -8,6 +8,13 @@ description: Maintains the ansible/roles/system_keyboard Ansible role that sets 
 Maintains `ansible/roles/system_keyboard/`. See `docs/ARCHITECTURE.md` for
 the shared conventions.
 
+`ansible/roles/system_keyboard/README.md` documents this role's full
+configuration surface (every `defaults/main.yml` variable, with its
+original inline comments, rendered as a single reference). Read it
+before proposing or explaining how to configure this role — it
+reflects the role's actual current defaults even if a variable summary
+elsewhere in this file has drifted out of sync with the role.
+
 ## What the role actually does
 
 Encoded in `ansible/roles/system_keyboard/defaults/main.yml`:

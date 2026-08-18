@@ -9,6 +9,13 @@ Maintains `ansible/roles/multipath_setup/`. See `docs/ARCHITECTURE.md` for the s
 conventions (role layout, audit vs. remediate via `--check --diff`, safety
 rules, branch + PR contribution workflow).
 
+`ansible/roles/multipath_setup/README.md` documents this role's full
+configuration surface (every `defaults/main.yml` variable, with its
+original inline comments, rendered as a single reference). Read it
+before proposing or explaining how to configure this role — it
+reflects the role's actual current defaults even if a variable summary
+elsewhere in this file has drifted out of sync with the role.
+
 ## What the role actually does
 
 Encoded in `ansible/roles/multipath_setup/defaults/main.yml`:

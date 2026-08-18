@@ -8,6 +8,13 @@ description: Maintains the ansible/roles/motd_issue Ansible role that deploys /e
 Maintains `ansible/roles/motd_issue/`. See `docs/ARCHITECTURE.md` for the
 shared conventions.
 
+`ansible/roles/motd_issue/README.md` documents this role's full
+configuration surface (every `defaults/main.yml` variable, with its
+original inline comments, rendered as a single reference). Read it
+before proposing or explaining how to configure this role — it
+reflects the role's actual current defaults even if a variable summary
+elsewhere in this file has drifted out of sync with the role.
+
 ## What the role actually does
 
 Encoded in `ansible/roles/motd_issue/defaults/main.yml` — both variables

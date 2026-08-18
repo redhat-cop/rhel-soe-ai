@@ -1,26 +1,57 @@
 ---
 name: vm_guest_agent
-description: Maintains the ansible/roles/vm_guest_agent Ansible role that detects the hypervisor a system runs under and installs/enables the matching guest agent (qemu-guest-agent, open-vm-tools, hyperv-daemons) as part of the Linux SOE. Use when checking guest-agent presence or state on a virtual machine.
+description: Maintains the ansible/roles/guest_agent Ansible role (this skill is named vm_guest_agent, but the actual role directory is guest_agent — see the note in the file body) that detects the hypervisor a system runs under and installs/enables the matching guest agent (qemu-guest-agent, open-vm-tools, hyperv-daemons/WALinuxAgent) as part of the Linux SOE, removing guest-agent packages on bare metal or unrecognized/Nutanix virtualization instead. Use when checking guest-agent presence or state on a virtual machine.
 ---
 
 # vm_guest_agent
 
-Maintains `ansible/roles/vm_guest_agent/`. See `docs/ARCHITECTURE.md` for
-the shared conventions. Unlike most domains, this role branches on detected
+Maintains `ansible/roles/guest_agent/` (see the naming-mismatch note under
+"What to do" below — this skill is named `vm_guest_agent`, but the actual
+role directory, and the tag that works against every playbook in this
+repo, are both `guest_agent`). See `docs/ARCHITECTURE.md` for the shared
+conventions. Unlike most domains, this role branches on detected
 virtualization type rather than checking one fixed baseline.
+
+`ansible/roles/guest_agent/README.md` documents this role's full
+configuration surface (every `defaults/main.yml` variable, with its
+original inline comments, rendered as a single reference). Read it before
+proposing or explaining how to configure this role — it reflects the
+role's actual current defaults even if a variable summary elsewhere in
+this file has drifted out of sync with the role.
 
 ## Baseline
 
-Encoded in `ansible/roles/vm_guest_agent/defaults/main.yml`
-(`soe_vm_guest_agent_map`), keyed by `systemd-detect-virt` output:
+`guest_agent_enable` (default `true`) is the only real on/off switch —
+there is no per-hypervisor mapping variable to override; which package/
+service applies is resolved entirely inside `tasks/main.yml` from
+`ansible_facts.virtualization_type`/`virtualization_role`/`system_vendor`,
+not from anything in `defaults/main.yml`. `guest_agent_remove_firmware`
+(default `true`) separately controls whether VM firmware packages
+(`*firmware*` families) get removed on guest hosts.
 
-- `kvm` → `qemu-guest-agent` package + `qemu-guest-agent.service`
-- `vmware` → `open-vm-tools` package + `vmtoolsd.service`
-- `microsoft` → `hyperv-daemons` package + `hypervkvpd.service`
-- `none` (bare metal) → no agent expected, reported as `[INFO]`
-- Anything else (e.g. a public cloud platform) → reported as `[INFO]`,
-  deferring to that provider's own guest-agent/cloud-init guidance rather
-  than guessing
+Actual behavior by detected virtualization (verified directly against
+`tasks/main.yml`, not assumed):
+
+- `virtualization_role != "guest"` (bare metal, or `guest_agent_enable:
+  false`) → **actively removes** `hyperv*`, `open-vm-tools`,
+  `qemu-guest-agent`, `spice-vdagent`, `WALinuxAgent` if present. This is
+  enforcement, not a passive `[INFO]` report — a host that used to be a VM
+  and is now bare metal gets cleaned up on the next run.
+- `system_vendor == "Nutanix"` (AHV) → all guest-agent packages are
+  **removed**, none installed. Nutanix AHV doesn't use any of the
+  packages this role manages, so this is deliberate, not an oversight.
+- `virtualization_type == "kvm"` (and not Nutanix) → installs
+  `qemu-guest-agent`, enables + starts `qemu-guest-agent.service`; removes
+  the other platforms' packages first.
+- `virtualization_type == "VirtualPC"` (Hyper-V/Azure) → installs
+  `hyperv-daemons` **and** `WALinuxAgent`, enables + starts
+  `waagent.service`; removes the other platforms' packages first.
+- `virtualization_type == "VMware"` → installs `open-vm-tools`, enables +
+  starts `vmtoolsd.service`; removes the other platforms' packages first.
+- Any other guest type (not `kvm`/`VirtualPC`/`VMware`, not Nutanix) →
+  removes all known guest packages, installs nothing — there's no generic
+  fallback agent, unlike what a naive reading of "detects and installs
+  the matching agent" might suggest.
 
 ## What to do
 
@@ -41,16 +72,23 @@ Encoded in `ansible/roles/vm_guest_agent/defaults/main.yml`
 approval.
 
 **Propose a change to the role itself** (e.g. adding a new hypervisor to
-`soe_vm_guest_agent_map`): never commit directly. On a branch named
-`soe/vm_guest_agent/<short-desc>`, edit the role, validate locally
-(`--syntax-check`, `ansible-lint roles/vm_guest_agent/`, `--check --diff`),
-push, and open a PR titled `[vm_guest_agent] <what changed>` with the
-`--check --diff` output in the body — then stop for human review. See
-`docs/ARCHITECTURE.md`'s "Contribution workflow".
+the `agent_packages`/`agent_services` dicts in `tasks/main.yml`): never
+commit directly. On a branch named `soe/guest_agent/<short-desc>` (the
+role's real name — see the naming-mismatch note above), edit
+`ansible/roles/guest_agent/`, validate locally (`--syntax-check`,
+`ansible-lint roles/guest_agent/`, `--check --diff`), push, and open a PR
+titled `[guest_agent] <what changed>` with the `--check --diff` output in
+the body — then stop for human review. See `docs/ARCHITECTURE.md`'s
+"Contribution workflow".
 
 ## Notes
 
-- If `systemd-detect-virt` returns something not in `soe_vm_guest_agent_map`
-  but the user says the host is a VM, ask rather than guessing which
-  package to install — installing the wrong guest agent (e.g.
-  `open-vm-tools` on a KVM guest) is wasted and can mask misconfiguration.
+- The per-hypervisor package/service mapping is hardcoded in
+  `tasks/main.yml` (`agent_packages`/`agent_services` dicts), not exposed
+  as a `defaults/main.yml` variable — there's nothing to override via
+  `-e` or group_vars for a new hypervisor type, only a role code change.
+- If `ansible_facts.virtualization_type` is something not covered by the
+  role's dicts (`kvm`, `VirtualPC`, `VMware`) but the user says the host
+  is a VM, ask rather than assuming — on an uncovered guest type the role
+  removes every known guest package and installs nothing, which could
+  surprise someone expecting *some* agent to end up installed.

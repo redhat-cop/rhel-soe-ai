@@ -10,6 +10,13 @@ the shared conventions — this is the role with the highest blast radius in
 the SOE. **Read this whole file before running remediate on any host with
 only physical console access.**
 
+`ansible/roles/usbguard_setup/README.md` documents this role's full
+configuration surface (every `defaults/main.yml` variable, with its
+original inline comments, rendered as a single reference). Read it
+before proposing or explaining how to configure this role — it
+reflects the role's actual current defaults even if a variable summary
+elsewhere in this file has drifted out of sync with the role.
+
 ## What the role actually does — service enablement is NOT opt-in
 
 Encoded in `ansible/roles/usbguard_setup/defaults/main.yml`:

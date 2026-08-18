@@ -9,6 +9,13 @@ Maintains `ansible/roles/security_hardening/`. See `docs/ARCHITECTURE.md` for th
 conventions (role layout, audit vs. remediate via `--check --diff`, safety
 rules, branch + PR contribution workflow).
 
+`ansible/roles/security_hardening/README.md` documents this role's full
+configuration surface (every `defaults/main.yml` variable, with its
+original inline comments, rendered as a single reference). Read it
+before proposing or explaining how to configure this role — it
+reflects the role's actual current defaults even if a variable summary
+elsewhere in this file has drifted out of sync with the role.
+
 ## What the role actually does
 
 Encoded in `ansible/roles/security_hardening/defaults/main.yml`:
