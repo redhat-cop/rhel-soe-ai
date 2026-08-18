@@ -1,0 +1,31 @@
+---
+# Allowed actions: join, leave
+domain_ad_action: join
+domain_ad_domain:
+
+# These should come from vault
+#domain_ad_admin_username:
+#domain_ad_admin_password:
+
+# Set these to false if AD computer objects are
+# created and deleted separately, without adcli
+domain_ad_join_computer_create: true
+domain_ad_leave_computer_delete: true
+# Remove cached users and secrets when leaving
+domain_ad_leave_sssd_cache_delete: true
+
+domain_ad_allow_groups:
+#  - GROUP@example.com
+
+# Enable or disable running authconfig/authselect
+# If false then setup by this role is not complete
+domain_ad_auth_config_update: true
+
+# Extra parameters for "authselect select" command
+# See the "authselect show sssd" output for details
+domain_ad_auth_select_parameters: without-nullok with-pamaccess with-mkhomedir
+
+# krb5.conf and sssd.conf template files to use
+# if not using the role provided default files
+domain_ad_krb5_config_file:
+domain_ad_sssd_config_file:

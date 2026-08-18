@@ -1,0 +1,24 @@
+---
+# External collection dependencies these roles actually call at runtime —
+# NOT this repo's own roles. Install with:
+#   ansible-galaxy collection install -r ansible/requirements.yml
+#
+# Deliberately does NOT list myllynen.rhel_ansible_roles (or this repo
+# itself) as a collection dependency. Doing so installs this repo's own
+# roles under the myllynen.rhel_ansible_roles collection identity, and
+# because every playbook here resolves bare role names via ansible.cfg's
+# roles_path, an installed copy under that identity previously caused
+# ansible-playbook to silently prefer the installed collection over the
+# roles/ directory sitting right next to these playbooks — including a
+# freshly-edited role that hadn't been committed yet. See
+# docs/ARCHITECTURE.md's "Collections vs. local roles" section.
+collections:
+  - name: ansible.posix
+    version: ">=1.5.4"
+  - name: community.general
+    version: ">=9.5.13"
+  - name: redhat.rhel_system_roles
+    # No minimum version is declared anywhere in this repo (checked
+    # roles/timesync/meta/main.yml — its dependencies: list is empty).
+    # Install whatever current version Galaxy resolves; pin here if a
+    # specific compatibility issue is ever found.
