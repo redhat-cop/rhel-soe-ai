@@ -150,8 +150,8 @@ custom MCP server or plugin involved.
 ### 1. Clone and launch
 
 ```sh
-git clone https://github.com/mglantz/soe-ai.git
-cd soe-ai
+git clone [https://github.com/redhat-cop/rhel-soe-ai](https://github.com/redhat-cop/rhel-soe-ai)
+cd rhel-soe-ai
 claude
 ```
 
