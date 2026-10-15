@@ -238,13 +238,13 @@ a failed task with the `fail_msg` explaining what's wrong, both under
 Two documents at the repo root of `docs/` capture context that cuts across
 every domain, and every skill is expected to notice when either one changes:
 
-- **`docs/POLICY.md`** — org-wide policy items. A new or changed item here
+- **`docs/HORIZONTAL_POLICY.md`** and **`docs/VERTICAL_POLICY.md`** — org-wide policy items. A new or changed item here
   can require a change to any number of roles (e.g. a new password-complexity
   policy affects `accounts_policy`; a new mandatory-logging policy affects
   `audit_setup`).
 - **`docs/WORKLOAD.md`** — the workloads actually hosted on top of this SOE
   (web tier, database, load balancer, NFS, etc.), in the same list-of-items
-  format as `POLICY.md`. A new workload can require changes to roles that
+  format as `HORIZONTAL_POLICY.md`. A new workload can require changes to roles that
   weren't previously exercised in anger (e.g. adding a database workload
   might mean `firewall` needs a new port, or `packages_install` needs a new
   package), or a new purpose-built playbook altogether (see "Playbook
@@ -256,14 +256,14 @@ agent needs to re-assess whether its own subsystem requires a change. In
 practice, "re-assess" means comparing commit timestamps:
 
 ```
-git log -1 --format='%cI %h %s' -- docs/POLICY.md docs/WORKLOAD.md
+git log -1 --format='%cI %h %s' -- docs/HORIZONTAL_POLICY.md docs/VERTICAL_POLICY.md docs/WORKLOAD.md
 git log -1 --format='%cI %h %s' -- ansible/roles/<domain>/
 ```
 
 If either doc's latest commit is newer than the role's latest commit, that
 role has not been assessed against whatever changed and may be missing
 something — read both docs and judge relevance. A skill finding nothing
-relevant should say so explicitly (e.g. "checked against `docs/POLICY.md`
+relevant should say so explicitly (e.g. "checked against `docs/HORIZONTAL_POLICY.md`, docs/VERTICAL_POLICY.md
 and `docs/WORKLOAD.md` as of `<date>`, nothing affecting this domain")
 rather than silently skipping the check; a skill finding something relevant
 proposes a change through the normal branch + PR workflow below, same as
@@ -290,10 +290,12 @@ directly:
 1. **Branch**: `soe/<domain>/<short-desc>`, e.g. `soe/timesync/add-ptp-check`.
    One domain per branch — don't bundle unrelated roles into the same
    change, so review stays scoped to what one agent actually owns.
-2. **Change**: edit `ansible/roles/<domain>/` only (a cross-cutting change
+   If there is a change triggered from a specific policy or workload change
+   then use soe/<domain>/<policyname>-<short-desc> or soe/<domain>/<workloadname>-<short-desc>
+3. **Change**: edit `ansible/roles/<domain>/` only (a cross-cutting change
    that touches one of the top-level playbooks or more than one role gets
    its own branch/PR, scoped just to that change).
-3. **Validate locally** before opening the PR, against whichever
+4. **Validate locally** before opening the PR, against whichever
    playbook(s) actually contain the role (see
    `.claude/skills/soe/SKILL.md`'s tables):
    - `ansible-playbook <playbook>.yml --tags <domain> --syntax-check`
@@ -308,13 +310,13 @@ directly:
    as a collection on the machine — see "Collections vs. local roles"
    above for why that matters here specifically: it's what makes this
    validation step trustworthy in the first place.
-4. **Commit** with a message explaining why, not just what.
-5. **Push and open a PR**:
+5. **Commit** with a message explaining why, not just what.
+6. **Push and open a PR**:
    - Title: `[<domain>] <what changed>`
    - Body: what changed and why, the `--check --diff` output (or a
      summary of it), and any safety notes — new opt-in flags, blast
      radius, anything a reviewer should specifically scrutinize.
-6. **Stop.** Do not merge. A human operator reviews and merges. CI
+7. **Stop.** Do not merge. A human operator reviews and merges. CI
    (`.github/workflows/ansible-ci.yml`) runs `--syntax-check` and
    `ansible-lint` automatically on the PR — treat a CI failure as
    something to fix, not to bypass, and don't merge on its behalf.
