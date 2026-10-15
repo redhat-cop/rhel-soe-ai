@@ -111,14 +111,14 @@ Fedora).
 
 ## Policy & workload awareness
 
-`docs/POLICY.md` (org-wide policy items) and `docs/WORKLOAD.md` (workloads
+`docs/VERTICAL_POLICY.md` and `docs/HORIZONTAL_POLICY.md` (org-wide policy items) and `docs/WORKLOAD.md` (workloads
 actually hosted on top of this SOE) are living documents every skill
 watches. When either gains a new/changed item more recently than a given
 role's own code was last touched, that role is stale relative to it and
 due for re-assessment:
 
 ```sh
-git log -1 --format='%cI %h %s' -- docs/POLICY.md docs/WORKLOAD.md
+git log -1 --format='%cI %h %s' -- docs/VERTICAL_POLICY.md docs/HORIZONTAL_POLICY.md docs/WORKLOAD.md
 git log -1 --format='%cI %h %s' -- ansible/roles/<domain>/
 ```
 
