@@ -9,6 +9,8 @@ Adding policies here has a risk of breaking forward compatibility for your Stand
 When new policy is added it is important to be conservative and trying and preserve the current baseline configuration state as much as possible. Meanwhile, policies listed here needs to always apply.
 As an example, if there is a policy for 2048 bit encryption to be used, this needs to be the default configuration state - if applicable.
 
+Linked files below should be fully digested.
+
 # Policy items
 If any items or changes are added in this section, that is a trigger to assess the impact on the technical subsystems you are responsible for.
 
