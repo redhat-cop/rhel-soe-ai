@@ -17,7 +17,7 @@ multi-playbook split.
 
 ## Policy & workload awareness (repo-wide)
 
-`docs/POLICY.md` and `docs/WORKLOAD.md` capture org-wide policy items and
+`docs/VERTICAL_POLICY.md`, `docs/HORIZONTAL_POLICY` and `docs/WORKLOAD.md` capture org-wide policy items and
 the workloads this SOE actually hosts. Every domain skill checks its own
 role for staleness against these two docs individually (see
 `docs/ARCHITECTURE.md`'s "Policy & workload awareness"); this skill can run
@@ -25,7 +25,7 @@ the same check across all 54 in-repo roles at once, as part of (or
 alongside) a full SOE audit:
 
 ```
-policy_ts=$(git log -1 --format=%ct -- docs/POLICY.md docs/WORKLOAD.md)
+policy_ts=$(git log -1 --format=%ct -- docs/VERTICAL_POLICY.md docs/HORIZONTAL_POLICY.md docs/WORKLOAD.md)
 for d in ansible/roles/*/; do
   name=$(basename "$d")
   role_ts=$(git log -1 --format=%ct -- "$d")

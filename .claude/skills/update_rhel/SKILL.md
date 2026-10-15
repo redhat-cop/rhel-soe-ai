@@ -23,7 +23,7 @@ there rather than in any role's own `defaults/main.yml` — check whether
 those need updating too:
 
 ```
-git log -1 --format='%cI %h %s' -- docs/POLICY.md docs/WORKLOAD.md
+git log -1 --format='%cI %h %s' -- docs/VERTICAL_POLICY.md docs/HORIZONTAL_POLICY.md docs/WORKLOAD.md
 git log -1 --format='%cI %h %s' -- ansible/update_rhel.yml
 ```
 
