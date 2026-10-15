@@ -18,14 +18,14 @@ elsewhere in this file has drifted out of sync with the role.
 
 ## Policy & workload awareness
 
-`docs/POLICY.md` and `docs/WORKLOAD.md` capture org-wide policy items and
+`docs/VERTICAL_POLICY.md`, `docs/HORIZONTAL_POLICY` and `docs/WORKLOAD.md` capture org-wide policy items and
 the workloads this SOE actually hosts — either can gain a new or changed
 item that this role should reflect. Before auditing, remediating, or
 proposing a change, check whether either doc has changed more recently
 than this role's own code:
 
 ```
-git log -1 --format='%cI %h %s' -- docs/POLICY.md docs/WORKLOAD.md
+git log -1 --format='%cI %h %s' -- docs/VERTICAL_POLICY.md docs/HORIZONTAL_POLICY.md docs/WORKLOAD.md
 git log -1 --format='%cI %h %s' -- ansible/roles/accounts_local/
 ```
 
@@ -40,7 +40,7 @@ whether anything added or changed since is relevant to this domain:
   `docs/ARCHITECTURE.md`'s "Contribution workflow"). Don't wait to be
   asked.
 - **Not relevant** — say so explicitly (e.g. "checked against
-  `docs/POLICY.md` and `docs/WORKLOAD.md` as of `<date>`, nothing affecting
+  `docs/VERTICAL_POLICY.md`, `docs/HORIZONTAL_POLICY` and `docs/WORKLOAD.md` as of `<date>`, nothing affecting
   this domain") rather than silently skipping the check.
 
 This check is informational, not a gate — it runs alongside a normal
